@@ -1,6 +1,229 @@
 #include <solution.h>
+#include <error_code.h>
+#include <process_info.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <dirent.h>
+#include <inttypes.h>
+#include <errno.h>
+#include <string.h>
+#include <limits.h>
+#include <stdbool.h>
+#include <stdlib.h>
+
+#define PROC_DIR_PATH "/proc"
+
+#define REPORT_RETURN_IF_NULL(res, path)                \
+if (!res)                                        		\
+{                                                       \
+    report_error(path, errno);							\
+    return ERR;                                         \
+}
+
+// ============================================================================
+
+/*
+	Checks if the given string is the valid integer number, returns true
+	in case of success, otherwise returns false. Puts number in (@param number) 
+	if it is not NULL
+*/
+static result_t IsNumber(const char* string, int* number);
+
+/*
+	Handles file, checks for "PID" file, puts it in processInfo struct. Returns OK in case of success,
+	otherwise appropriate error code.
+*/
+static result_t HandleFile(const struct dirent* dirent, process_info_t* processInfo);
+
+/*
+	Reads file into the given pointer, allocates needed space (not more than PATH_MAX). Returns OK in case of success,
+	otherwise appropriate error code.
+*/
+static result_t ReadFile(int dirfd, const char* name, char** string);
+
+/*
+	Put argv info into process_info_t struct. Returns OK in case of success,
+	otherwise appropriate error code.
+*/
+static result_t GetArgv(int dirfd, process_info_t* processInfo);
+
+/*
+	Put exe info into process_info_t struct. Returns OK in case of success,
+	otherwise appropriate error code.
+*/
+static result_t GetExe(int dirFd, process_info_t* processInfo);
+
+/*
+	Put envp info into process_info_t struct. Returns OK in case of success,
+	otherwise appropriate error code.
+*/
+static result_t GetEnvp(int dirfd, process_info_t* processInfo);
+
+/*
+	Reads array of strings from the given string. Returns array in case of success, otherwise returns NULL
+*/
+static char** ReadArray(char* string);
+// ============================================================================
+
+static result_t IsNumber(const char* string, int* number)
+{
+	if (!string)
+		return WRONG_ARG; // null input string
+
+	char* endptr = NULL;
+	int input = 0;
+
+	input = strtoimax(string, &endptr, 10);
+	if (endptr == string || *endptr != '\0')
+		return WRONG_ARG;
+	if (errno == ERANGE && (input == INT_MAX || input == INT_MIN || input == 0))
+		return OUT_OF_RANGE;
+	
+	if (number)
+		*number = input;
+	
+	return true;
+}
+
+static result_t ReadFile(int dirfd, const char* name, char** string)
+{
+	RETURN_IF_NULL(string);
+
+	int fd = openat(dirfd, name, O_RDONLY);
+	RETURN_IF_ERR(fd);
+
+	*string = (char*) malloc(PATH_MAX * sizeof(char));
+	RETURN_IF_NULL(*string);
+
+	ssize_t size = read(fd, *string, PATH_MAX * sizeof(char));
+	RETURN_IF_ERR(size);
+	if (size >= PATH_MAX)
+		return OUT_OF_MEM;
+
+	(*string)[size] = '\0';
+	(*string)[size + 1] = '\0';
+
+	close(fd);
+	return OK;
+}
+
+static char** ReadArray(char* string)
+{
+	size_t argc = 0;
+	
+	// Count argc, then allocate array of pointers
+	char* p = string;
+	while (*p != '\0' && argc != ULONG_MAX)
+	{
+		++argc;
+		p = strchr(p, '\0') + 1;
+	}
+
+	if (argc == ULONG_MAX)
+		return NULL;
+
+	// Fill argv "flag by flag"
+	char** argv = (char**) malloc(sizeof(char*) * (argc + 1));
+	p = string;
+
+	for (size_t i = 0; i < argc; ++i)
+	{
+		argv[i] = p;
+		p = strchr(p, '\0') + 1;
+	}
+
+	argv[argc] = NULL;
+	return argv;
+}
+
+static result_t GetArgv(int dirfd, process_info_t* processInfo)
+{
+	char* string = NULL;
+	const char* cmdPath = "cmdline";
+
+	RETURN_IF_FAIL(ReadFile(dirfd, cmdPath, &string));
+	processInfo->argv = ReadArray(string);
+
+	REPORT_RETURN_IF_NULL(processInfo->argv, cmdPath);
+	return OK;
+}
+
+static result_t GetEnvp(int dirfd, process_info_t* processInfo)
+{
+	char* string = NULL;
+	const char* envPath = "environ";
+
+	RETURN_IF_FAIL(ReadFile(dirfd, envPath, &string));
+	processInfo->envp = ReadArray(string);
+
+	REPORT_RETURN_IF_NULL(processInfo->envp, envPath);
+	return OK;
+}
+
+static result_t GetExe(int dirFd, process_info_t* processInfo)
+{
+	char buff[PATH_MAX];
+	const char* exeDir = "exe";
+
+	ssize_t len = readlinkat(dirFd, exeDir, buff, PATH_MAX);
+	REPORT_RETURN_IF_NULL(len, exeDir);
+	buff[len] = '\0';
+
+	processInfo->exe = (char*) malloc((len + 1) * sizeof(char));
+	RETURN_IF_NULL(processInfo->exe);
+
+	memcpy(processInfo->exe, buff, (len + 1) * sizeof(char));
+	return OK;
+}
+
+static result_t HandleFile(const struct dirent* dirent, process_info_t* processInfo)
+{
+
+	// Open directory with process pid as it will be used later
+	int procDirFd = open(PROC_DIR_PATH, O_RDONLY);
+	RETURN_IF_ERR(procDirFd);
+
+	int currentProcDirFd = openat(procDirFd, dirent->d_name, O_RDONLY);
+	RETURN_IF_ERR(currentProcDirFd);
+
+	RETURN_IF_FAIL(GetExe(currentProcDirFd, processInfo));
+	RETURN_IF_FAIL(GetArgv(currentProcDirFd, processInfo));
+	RETURN_IF_FAIL(GetEnvp(currentProcDirFd, processInfo));
+
+	return OK;
+}
 
 void ps(void)
 {
-	/* implement me */
+	// Open "/proc/" dir and list all files
+	DIR* procDir = opendir(PROC_DIR_PATH);
+	if (!procDir)
+	{
+		report_error(PROC_DIR_PATH, errno);
+		return ;
+	}
+
+	struct dirent* currentFileStruct = NULL;
+	process_info_t processInfo = {};
+
+	while ((currentFileStruct = readdir(procDir)) != NULL)
+	{
+		// Proccess are directories with only digits in their names
+		if (!IS_TRUE(IsNumber(currentFileStruct->d_name, &processInfo.pid)))
+			continue;
+
+		if (!IS_OK(HandleFile(currentFileStruct, &processInfo)))
+		{
+			report_error(currentFileStruct->d_name, errno);
+			continue;
+		}
+
+		report_process(processInfo.pid, processInfo.exe, processInfo.argv, processInfo.envp);
+	}
+
+	closedir(procDir);
 }
