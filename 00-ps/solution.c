@@ -4,6 +4,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/resource.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -96,7 +97,17 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 	int fd = openat(dirfd, name, O_RDONLY);
 	RETURN_IF_ERR(fd);
 
-	*string = (char*) malloc(PATH_MAX * sizeof(char));
+	/*
+		According to man 2 execve: "On kernel 2.6.23 and later, most architectures support a size
+       	limit derived from the soft RLIMIT_STACK resource limit (see
+       	getrlimit(2)) that is in force at the time of the execve() call."
+	
+		Also, use so-called "soft" limit to save some memory
+	*/ 
+	struct rlimit lim;
+	RETURN_IF_ERR(getrlimit(RLIMIT_STACK, &lim));
+
+	*string = (char*) malloc(lim.rlim_cur * sizeof(char));
 	RETURN_IF_NULL(*string);
 
 	ssize_t size = read(fd, *string, PATH_MAX * sizeof(char));
@@ -113,24 +124,25 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 
 static char** ReadArray(char* string)
 {
-	size_t argc = 0;
+	int argc = 0;
 	
 	// Count argc, then allocate array of pointers
 	char* p = string;
-	while (*p != '\0' && argc != ULONG_MAX)
+	long argMax = sysconf(_SC_ARG_MAX); // ARG_MAX is defined in <limits.h>, too, but it is safer to get it runtime from sysconf
+	while (*p != '\0' && argc != argMax)
 	{
 		++argc;
 		p = strchr(p, '\0') + 1;
 	}
 
-	if (argc == ULONG_MAX)
+	if (argc == argMax)
 		return NULL;
 
 	// Fill argv "flag by flag"
 	char** argv = (char**) malloc(sizeof(char*) * (argc + 1));
 	p = string;
 
-	for (size_t i = 0; i < argc; ++i)
+	for (long i = 0; i < argc; ++i)
 	{
 		argv[i] = p;
 		p = strchr(p, '\0') + 1;
@@ -194,6 +206,9 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 	RETURN_IF_FAIL(GetArgv(currentProcDirFd, processInfo));
 	RETURN_IF_FAIL(GetEnvp(currentProcDirFd, processInfo));
 
+	close(procDirFd);
+	close(currentProcDirFd);
+
 	return OK;
 }
 
@@ -208,21 +223,23 @@ void ps(void)
 	}
 
 	struct dirent* currentFileStruct = NULL;
-	process_info_t processInfo = {};
-
 	while ((currentFileStruct = readdir(procDir)) != NULL)
 	{
+		process_info_t processInfo = {};
+
 		// Proccess are directories with only digits in their names
 		if (!IS_TRUE(IsNumber(currentFileStruct->d_name, &processInfo.pid)))
 			continue;
 
 		if (!IS_OK(HandleFile(currentFileStruct, &processInfo)))
 		{
+			DestroyProcessInfo(&processInfo);
 			report_error(currentFileStruct->d_name, errno);
 			continue;
 		}
 
 		report_process(processInfo.pid, processInfo.exe, processInfo.argv, processInfo.envp);
+		DestroyProcessInfo(&processInfo);
 	}
 
 	closedir(procDir);
