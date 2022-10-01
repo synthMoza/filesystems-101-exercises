@@ -95,7 +95,11 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 	RETURN_IF_NULL(string);
 
 	int fd = openat(dirfd, name, O_RDONLY);
-	RETURN_IF_ERR(fd);
+	if (fd == -1)
+	{
+		report_error(name, errno);
+		return ERR;
+	}
 
 	/*
 		According to man 2 execve: "On kernel 2.6.23 and later, most architectures support a size
