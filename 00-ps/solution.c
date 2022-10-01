@@ -121,8 +121,8 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 		return OUT_OF_MEM;
 	}
 
-	ssize_t size = read(fd, *string, PATH_MAX * sizeof(char));
-	if (size >= PATH_MAX || size == -1)
+	ssize_t size = read(fd, *string, lim.rlim_cur * sizeof(char));
+	if (size == -1)
 	{
 		report_error(name, errno);
 
