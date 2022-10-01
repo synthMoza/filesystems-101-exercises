@@ -208,10 +208,14 @@ static result_t GetEnvp(int dirfd, process_info_t* processInfo)
 static result_t GetExe(int dirFd, process_info_t* processInfo)
 {
 	char buff[PATH_MAX + 1];
-	const char* exeDir = "exe";
+	const char* exeLink = "exe";
 
-	ssize_t len = readlinkat(dirFd, exeDir, buff, PATH_MAX);
-	REPORT_RETURN_IF_NULL(len, "proc/**/exe");
+	ssize_t len = readlinkat(dirFd, exeLink, buff, PATH_MAX);
+	if (len == -1)
+	{
+		report_error(exeLink, errno);
+		return ERR;
+	}
 	buff[len] = '\0';
 
 	processInfo->exe = (char*) malloc((len + 1) * sizeof(char));
