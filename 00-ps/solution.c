@@ -105,15 +105,26 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 		Also, use so-called "soft" limit to save some memory
 	*/ 
 	struct rlimit lim;
-	RETURN_IF_ERR(getrlimit(RLIMIT_STACK, &lim));
+	if (getrlimit(RLIMIT_STACK, &lim) == -1)
+	{
+		close(fd);
+		return ERR;
+	}
 
 	*string = (char*) malloc(lim.rlim_cur * sizeof(char));
-	RETURN_IF_NULL(*string);
+	if (!(*string))
+	{
+		close(fd);
+		return OUT_OF_MEM;
+	}
 
 	ssize_t size = read(fd, *string, PATH_MAX * sizeof(char));
-	RETURN_IF_ERR(size);
-	if (size >= PATH_MAX)
+	if (size >= PATH_MAX || size == -1)
+	{
+		free(*string);
+		close(fd);
 		return OUT_OF_MEM;
+	}
 
 	(*string)[size] = '\0';
 	(*string)[size + 1] = '\0';
@@ -200,11 +211,35 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 	RETURN_IF_ERR(procDirFd);
 
 	int currentProcDirFd = openat(procDirFd, dirent->d_name, O_RDONLY);
-	RETURN_IF_ERR(currentProcDirFd);
+	if (currentProcDirFd == -1)
+	{
+		close(procDirFd);
+		return ERR;
+	}
 
-	RETURN_IF_FAIL(GetExe(currentProcDirFd, processInfo));
-	RETURN_IF_FAIL(GetArgv(currentProcDirFd, processInfo));
-	RETURN_IF_FAIL(GetEnvp(currentProcDirFd, processInfo));
+	if (!IS_OK(GetExe(currentProcDirFd, processInfo)))
+	{
+		close(currentProcDirFd);
+		close(procDirFd);
+
+		return ERR;
+	}
+
+	if (!IS_OK(GetArgv(currentProcDirFd, processInfo)))
+	{
+		close(currentProcDirFd);
+		close(procDirFd);
+
+		return ERR;
+	}
+
+	if (!IS_OK(GetEnvp(currentProcDirFd, processInfo)))
+	{
+		close(currentProcDirFd);
+		close(procDirFd);
+
+		return ERR;
+	}
 
 	close(procDirFd);
 	close(currentProcDirFd);
