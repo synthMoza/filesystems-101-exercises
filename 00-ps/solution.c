@@ -203,7 +203,7 @@ static result_t GetEnvp(int dirfd, process_info_t* processInfo)
 
 static result_t GetExe(int dirFd, process_info_t* processInfo)
 {
-	char buff[PATH_MAX];
+	char buff[PATH_MAX + 1];
 	const char* exeDir = "exe";
 
 	ssize_t len = readlinkat(dirFd, exeDir, buff, PATH_MAX);
