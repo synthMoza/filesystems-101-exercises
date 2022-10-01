@@ -284,6 +284,7 @@ void ps(void)
 	}
 
 	struct dirent* currentFileStruct = NULL;
+	errno = 0;
 	while ((currentFileStruct = readdir(procDir)) != NULL)
 	{
 		process_info_t processInfo = {};
@@ -302,6 +303,9 @@ void ps(void)
 		report_process(processInfo.pid, processInfo.exe, processInfo.argv, processInfo.envp);
 		DestroyProcessInfo(&processInfo);
 	}
+
+	if (errno != 0)
+		report_error(PROC_DIR_PATH, errno);
 
 	closedir(procDir);
 }
