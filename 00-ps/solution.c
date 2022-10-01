@@ -295,8 +295,8 @@ void ps(void)
 
 		if (!IS_OK(HandleFile(currentFileStruct, &processInfo)))
 		{
-			DestroyProcessInfo(&processInfo);
 			report_error(currentFileStruct->d_name, errno);
+			DestroyProcessInfo(&processInfo);
 			continue;
 		}
 
