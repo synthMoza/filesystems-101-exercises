@@ -104,6 +104,7 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 	
 		Also, use so-called "soft" limit to save some memory
 	*/ 
+	
 	struct rlimit lim;
 	if (getrlimit(RLIMIT_STACK, &lim) == -1)
 	{
@@ -111,7 +112,7 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 		return ERR;
 	}
 
-	*string = (char*) malloc(lim.rlim_cur * sizeof(char));
+	*string = (char*) malloc(4 * lim.rlim_cur * sizeof(char));
 	if (!(*string))
 	{
 		close(fd);
