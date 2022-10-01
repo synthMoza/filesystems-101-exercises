@@ -107,7 +107,7 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
        	getrlimit(2)) that is in force at the time of the execve() call."
 	
 		Also, use so-called "soft" limit to save some memory
-	*/ 
+	*/
 	
 	struct rlimit lim;
 	if (getrlimit(RLIMIT_STACK, &lim) == -1)
@@ -227,7 +227,6 @@ static result_t GetExe(int dirFd, process_info_t* processInfo)
 
 static result_t HandleFile(const struct dirent* dirent, process_info_t* processInfo)
 {
-
 	// Open directory with process pid as it will be used later
 	int procDirFd = open(PROC_DIR_PATH, O_RDONLY);
 	if (procDirFd == -1)
@@ -308,7 +307,7 @@ void ps(void)
 		DestroyProcessInfo(&processInfo);
 	}
 
-	if (errno != 0)
+	// if (errno != 0)
 		report_error(PROC_DIR_PATH, errno);
 
 	closedir(procDir);
