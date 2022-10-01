@@ -111,7 +111,7 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 		return ERR;
 	}
 
-	*string = (char*) malloc(lim.rlim_max * sizeof(char));
+	*string = (char*) malloc(lim.rlim_cur * sizeof(char));
 	if (!(*string))
 	{
 		close(fd);
