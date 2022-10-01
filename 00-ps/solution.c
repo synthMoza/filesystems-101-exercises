@@ -207,7 +207,7 @@ static result_t GetExe(int dirFd, process_info_t* processInfo)
 	const char* exeDir = "exe";
 
 	ssize_t len = readlinkat(dirFd, exeDir, buff, PATH_MAX);
-	REPORT_RETURN_IF_NULL(len, exeDir);
+	REPORT_RETURN_IF_NULL(len, "proc/**/exe");
 	buff[len] = '\0';
 
 	processInfo->exe = (char*) malloc((len + 1) * sizeof(char));
