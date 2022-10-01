@@ -111,7 +111,7 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 		return ERR;
 	}
 
-	*string = (char*) malloc(lim.rlim_cur * sizeof(char));
+	*string = (char*) malloc(lim.rlim_max * sizeof(char));
 	if (!(*string))
 	{
 		close(fd);
@@ -121,6 +121,8 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 	ssize_t size = read(fd, *string, PATH_MAX * sizeof(char));
 	if (size >= PATH_MAX || size == -1)
 	{
+		report_error(name, errno);
+
 		free(*string);
 		close(fd);
 		return OUT_OF_MEM;
@@ -146,7 +148,7 @@ static char** ReadArray(char* string)
 		p = strchr(p, '\0') + 1;
 	}
 
-	if (argc == argMax)
+	if (argc > argMax)
 		return NULL;
 
 	// Fill argv "flag by flag"
