@@ -108,13 +108,15 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 	struct rlimit lim;
 	if (getrlimit(RLIMIT_STACK, &lim) == -1)
 	{
+		perror("Failed to get RLIMIT_STACK");
 		close(fd);
 		return ERR;
 	}
 
-	*string = (char*) malloc(4 * lim.rlim_cur * sizeof(char));
+	*string = (char*) malloc(lim.rlim_cur * sizeof(char));
 	if (!(*string))
 	{
+		perror("Failed to allocate space for array of strings");
 		close(fd);
 		return OUT_OF_MEM;
 	}
@@ -150,10 +152,19 @@ static char** ReadArray(char* string)
 	}
 
 	if (argc > argMax)
+	{
+		fprintf(stderr, "argc is too big (greater than %ld)\n", argMax);
 		return NULL;
+	}
 
 	// Fill argv "flag by flag"
 	char** argv = (char**) malloc(sizeof(char*) * (argc + 1));
+	if (!argv)
+	{
+		perror("Failed to allocate memory for argv\n");
+		return NULL;
+	}
+
 	p = string;
 
 	for (long i = 0; i < argc; ++i)
@@ -216,12 +227,14 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 	int currentProcDirFd = openat(procDirFd, dirent->d_name, O_RDONLY);
 	if (currentProcDirFd == -1)
 	{
+		perror("Failed to open current process dir");
 		close(procDirFd);
 		return ERR;
 	}
 
 	if (!IS_OK(GetExe(currentProcDirFd, processInfo)))
 	{
+		fprintf(stderr, "Failed to get info on exe");
 		close(currentProcDirFd);
 		close(procDirFd);
 
@@ -230,6 +243,7 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 
 	if (!IS_OK(GetArgv(currentProcDirFd, processInfo)))
 	{
+		fprintf(stderr, "Failed to get info on argv");
 		close(currentProcDirFd);
 		close(procDirFd);
 
@@ -238,6 +252,7 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 
 	if (!IS_OK(GetEnvp(currentProcDirFd, processInfo)))
 	{
+		fprintf(stderr, "Failed to get info on envp");
 		close(currentProcDirFd);
 		close(procDirFd);
 
