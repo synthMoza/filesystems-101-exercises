@@ -222,12 +222,16 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 
 	// Open directory with process pid as it will be used later
 	int procDirFd = open(PROC_DIR_PATH, O_RDONLY);
-	RETURN_IF_ERR(procDirFd);
+	if (procDirFd == -1)
+	{
+		report_error(PROC_DIR_PATH, errno);
+		return ERR;
+	}
 
 	int currentProcDirFd = openat(procDirFd, dirent->d_name, O_RDONLY);
 	if (currentProcDirFd == -1)
 	{
-		perror("Failed to open current process dir");
+		report_error(dirent->d_name, errno);
 		close(procDirFd);
 		return ERR;
 	}
