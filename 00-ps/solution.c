@@ -96,7 +96,7 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 	RETURN_IF_NULL(string);
 
 	char filePath[PATH_MAX];
-	sprintf(filePath, "/%s/%s/%s", PROC_DIR_PATH, pidName, name);
+	sprintf(filePath, "%s/%s/%s", PROC_DIR_PATH, pidName, name);
 
 	int fd = openat(dirfd, name, O_RDONLY);
 	if (fd == -1)
@@ -220,7 +220,7 @@ static result_t GetExe(int dirFd, process_info_t *processInfo, const char* name)
 		int saveErrno = errno;
 
 		char filePath[PATH_MAX];
-		sprintf(filePath, "/%s/%s/%s", PROC_DIR_PATH, name, exeLink);
+		sprintf(filePath, "%s/%s/%s", PROC_DIR_PATH, name, exeLink);
 
 		report_error(filePath, saveErrno);
 		return ERR;
@@ -250,7 +250,7 @@ static result_t HandleFile(const struct dirent *dirent, process_info_t *processI
 		int saveErrno = errno;
 
 		char filePath[PATH_MAX];
-		sprintf(filePath, "/%s/%s", PROC_DIR_PATH, dirent->d_name);
+		sprintf(filePath, "%s/%s", PROC_DIR_PATH, dirent->d_name);
 		report_error(filePath, saveErrno);
 
 		close(procDirFd);
