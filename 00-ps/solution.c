@@ -223,6 +223,7 @@ static result_t GetExe(int dirFd, process_info_t *processInfo, const char* name)
 		sprintf(filePath, "%s/%s/%s", PROC_DIR_PATH, name, exeLink);
 
 		report_error(filePath, saveErrno);
+		return ERR;
 	}
 	buff[len] = '\0';
 
@@ -308,7 +309,6 @@ void ps(void)
 
 		if (!IS_OK(HandleFile(currentFileStruct, &processInfo)))
 		{
-			perror("Failed to handle file");
 			DestroyProcessInfo(&processInfo);
 			continue;
 		}
