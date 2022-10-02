@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/resource.h>
 #include <fcntl.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <dirent.h>
@@ -18,64 +19,64 @@
 
 #define PROC_DIR_PATH "/proc"
 
-#define REPORT_RETURN_IF_NULL(res, path)                \
-if (!res)                                        		\
-{                                                       \
-    report_error(path, errno);							\
-    return ERR;                                         \
-}
+#define REPORT_RETURN_IF_NULL(res, path) \
+	if (!res)                            \
+	{                                    \
+		report_error(path, errno);       \
+		return ERR;                      \
+	}
 
 // ============================================================================
 
 /*
 	Checks if the given string is the valid integer number, returns true
-	in case of success, otherwise returns false. Puts number in (@param number) 
+	in case of success, otherwise returns false. Puts number in (@param number)
 	if it is not NULL
 */
-static result_t IsNumber(const char* string, int* number);
+static result_t IsNumber(const char *string, int *number);
 
 /*
 	Handles file, checks for "PID" file, puts it in processInfo struct. Returns OK in case of success,
 	otherwise appropriate error code.
 */
-static result_t HandleFile(const struct dirent* dirent, process_info_t* processInfo);
+static result_t HandleFile(const struct dirent *dirent, process_info_t *processInfo);
 
 /*
 	Reads file into the given pointer, allocates needed space (not more than PATH_MAX). Returns OK in case of success,
 	otherwise appropriate error code.
 */
-static result_t ReadFile(int dirfd, const char* name, char** string);
+static result_t ReadFile(int dirfd, const char *name, char **string);
 
 /*
 	Put argv info into process_info_t struct. Returns OK in case of success,
 	otherwise appropriate error code.
 */
-static result_t GetArgv(int dirfd, process_info_t* processInfo);
+static result_t GetArgv(int dirfd, process_info_t *processInfo);
 
 /*
 	Put exe info into process_info_t struct. Returns OK in case of success,
 	otherwise appropriate error code.
 */
-static result_t GetExe(int dirFd, process_info_t* processInfo);
+static result_t GetExe(int dirFd, process_info_t *processInfo);
 
 /*
 	Put envp info into process_info_t struct. Returns OK in case of success,
 	otherwise appropriate error code.
 */
-static result_t GetEnvp(int dirfd, process_info_t* processInfo);
+static result_t GetEnvp(int dirfd, process_info_t *processInfo);
 
 /*
 	Reads array of strings from the given string. Returns array in case of success, otherwise returns NULL
 */
-static char** ReadArray(char* string);
+static char **ReadArray(char *string);
 // ============================================================================
 
-static result_t IsNumber(const char* string, int* number)
+static result_t IsNumber(const char *string, int *number)
 {
 	if (!string)
 		return WRONG_ARG; // null input string
 
-	char* endptr = NULL;
+	char *endptr = NULL;
 	int input = 0;
 
 	input = strtoimax(string, &endptr, 10);
@@ -83,32 +84,29 @@ static result_t IsNumber(const char* string, int* number)
 		return WRONG_ARG;
 	if (errno == ERANGE && (input == INT_MAX || input == INT_MIN || input == 0))
 		return OUT_OF_RANGE;
-	
+
 	if (number)
 		*number = input;
-	
+
 	return true;
 }
 
-static result_t ReadFile(int dirfd, const char* name, char** string)
+static result_t ReadFile(int dirfd, const char *name, char **string)
 {
 	RETURN_IF_NULL(string);
 
 	int fd = openat(dirfd, name, O_RDONLY);
 	if (fd == -1)
-	{
-		report_error(name, errno);
 		return ERR;
-	}
 
 	/*
 		According to man 2 execve: "On kernel 2.6.23 and later, most architectures support a size
-       	limit derived from the soft RLIMIT_STACK resource limit (see
-       	getrlimit(2)) that is in force at the time of the execve() call."
-	
+		limit derived from the soft RLIMIT_STACK resource limit (see
+		getrlimit(2)) that is in force at the time of the execve() call."
+
 		Also, use so-called "soft" limit to save some memory
 	*/
-	
+
 	struct rlimit lim;
 	if (getrlimit(RLIMIT_STACK, &lim) == -1)
 	{
@@ -117,7 +115,7 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 		return ERR;
 	}
 
-	*string = (char*) malloc(lim.rlim_cur * sizeof(char));
+	*string = (char *)malloc(lim.rlim_cur * sizeof(char));
 	if (!(*string))
 	{
 		perror("Failed to allocate space for array of strings");
@@ -128,8 +126,6 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 	ssize_t size = read(fd, *string, lim.rlim_cur * sizeof(char));
 	if (size == -1)
 	{
-		report_error(name, errno);
-
 		free(*string);
 		close(fd);
 		return OUT_OF_MEM;
@@ -142,12 +138,12 @@ static result_t ReadFile(int dirfd, const char* name, char** string)
 	return OK;
 }
 
-static char** ReadArray(char* string)
+static char **ReadArray(char *string)
 {
 	int argc = 0;
-	
+
 	// Count argc, then allocate array of pointers
-	char* p = string;
+	char *p = string;
 	long argMax = sysconf(_SC_ARG_MAX); // ARG_MAX is defined in <limits.h>, too, but it is safer to get it runtime from sysconf
 	while (*p != '\0' && argc != argMax)
 	{
@@ -162,7 +158,7 @@ static char** ReadArray(char* string)
 	}
 
 	// Fill argv "flag by flag"
-	char** argv = (char**) malloc(sizeof(char*) * (argc + 1));
+	char **argv = (char **)malloc(sizeof(char *) * (argc + 1));
 	if (!argv)
 	{
 		perror("Failed to allocate memory for argv\n");
@@ -181,10 +177,10 @@ static char** ReadArray(char* string)
 	return argv;
 }
 
-static result_t GetArgv(int dirfd, process_info_t* processInfo)
+static result_t GetArgv(int dirfd, process_info_t *processInfo)
 {
-	char* string = NULL;
-	const char* cmdPath = "cmdline";
+	char *string = NULL;
+	const char *cmdPath = "cmdline";
 
 	RETURN_IF_FAIL(ReadFile(dirfd, cmdPath, &string));
 	processInfo->argv = ReadArray(string);
@@ -193,10 +189,10 @@ static result_t GetArgv(int dirfd, process_info_t* processInfo)
 	return OK;
 }
 
-static result_t GetEnvp(int dirfd, process_info_t* processInfo)
+static result_t GetEnvp(int dirfd, process_info_t *processInfo)
 {
-	char* string = NULL;
-	const char* envPath = "environ";
+	char *string = NULL;
+	const char *envPath = "environ";
 
 	RETURN_IF_FAIL(ReadFile(dirfd, envPath, &string));
 	processInfo->envp = ReadArray(string);
@@ -205,27 +201,23 @@ static result_t GetEnvp(int dirfd, process_info_t* processInfo)
 	return OK;
 }
 
-static result_t GetExe(int dirFd, process_info_t* processInfo)
+static result_t GetExe(int dirFd, process_info_t *processInfo)
 {
 	char buff[PATH_MAX + 1];
-	const char* exeLink = "exe";
+	const char *exeLink = "exe";
 
 	ssize_t len = readlinkat(dirFd, exeLink, buff, PATH_MAX);
-	if (len == -1)
-	{
-		report_error(exeLink, errno);
-		return ERR;
-	}
+	RETURN_IF_ERR(len);
 	buff[len] = '\0';
 
-	processInfo->exe = (char*) malloc((len + 1) * sizeof(char));
+	processInfo->exe = (char *)malloc((len + 1) * sizeof(char));
 	RETURN_IF_NULL(processInfo->exe);
 
 	memcpy(processInfo->exe, buff, (len + 1) * sizeof(char));
 	return OK;
 }
 
-static result_t HandleFile(const struct dirent* dirent, process_info_t* processInfo)
+static result_t HandleFile(const struct dirent *dirent, process_info_t *processInfo)
 {
 	// Open directory with process pid as it will be used later
 	int procDirFd = open(PROC_DIR_PATH, O_RDONLY);
@@ -238,13 +230,19 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 	int currentProcDirFd = openat(procDirFd, dirent->d_name, O_RDONLY);
 	if (currentProcDirFd == -1)
 	{
-		report_error(dirent->d_name, errno);
+		char filePath[PATH_MAX];
+		sprintf(filePath, "%s/%s", PROC_DIR_PATH, dirent->d_name);
+
+		report_error(filePath, errno);
 		close(procDirFd);
 		return ERR;
 	}
 
 	if (!IS_OK(GetExe(currentProcDirFd, processInfo)))
 	{
+		char filePath[PATH_MAX];
+		sprintf(filePath, "%s/%s/exe", PROC_DIR_PATH, dirent->d_name);
+
 		report_error("exe", errno);
 		close(currentProcDirFd);
 		close(procDirFd);
@@ -254,6 +252,9 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 
 	if (!IS_OK(GetArgv(currentProcDirFd, processInfo)))
 	{
+		char filePath[PATH_MAX];
+		sprintf(filePath, "%s/%s/cmdline", PROC_DIR_PATH, dirent->d_name);
+
 		report_error("argv", errno);
 		close(currentProcDirFd);
 		close(procDirFd);
@@ -263,6 +264,9 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 
 	if (!IS_OK(GetEnvp(currentProcDirFd, processInfo)))
 	{
+		char filePath[PATH_MAX];
+		sprintf(filePath, "%s/%s/environ", PROC_DIR_PATH, dirent->d_name);
+
 		report_error("envp", errno);
 		close(currentProcDirFd);
 		close(procDirFd);
@@ -279,14 +283,14 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 void ps(void)
 {
 	// Open "/proc/" dir and list all files
-	DIR* procDir = opendir(PROC_DIR_PATH);
+	DIR *procDir = opendir(PROC_DIR_PATH);
 	if (!procDir)
 	{
 		report_error(PROC_DIR_PATH, errno);
-		return ;
+		return;
 	}
 
-	struct dirent* currentFileStruct = NULL;
+	struct dirent *currentFileStruct = NULL;
 	errno = 0;
 	while ((currentFileStruct = readdir(procDir)) != NULL)
 	{
@@ -298,7 +302,7 @@ void ps(void)
 
 		if (!IS_OK(HandleFile(currentFileStruct, &processInfo)))
 		{
-			report_error(currentFileStruct->d_name, errno);
+			perror("Failed to handle file");
 			DestroyProcessInfo(&processInfo);
 			continue;
 		}
