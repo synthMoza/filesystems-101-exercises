@@ -289,7 +289,7 @@ static result_t HandleFile(const struct dirent *dirent, process_info_t *processI
 
 void ps(void)
 {
-	// Open "/proc/" dir and list all files
+	// Open "/proc" dir and list all files
 	DIR *procDir = opendir(PROC_DIR_PATH);
 	if (!procDir)
 	{
@@ -310,7 +310,7 @@ void ps(void)
 		if (!IS_OK(HandleFile(currentFileStruct, &processInfo)))
 		{
 			DestroyProcessInfo(&processInfo);
-			continue;
+			break;
 		}
 
 		report_process(processInfo.pid, processInfo.exe, processInfo.argv, processInfo.envp);
