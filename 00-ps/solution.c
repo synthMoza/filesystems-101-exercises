@@ -243,7 +243,7 @@ static result_t HandleFile(const struct dirent *dirent, process_info_t *processI
 		char filePath[PATH_MAX];
 		sprintf(filePath, "%s/%s/exe", PROC_DIR_PATH, dirent->d_name);
 
-		report_error("exe", errno);
+		report_error(filePath, errno);
 		close(currentProcDirFd);
 		close(procDirFd);
 
@@ -255,7 +255,7 @@ static result_t HandleFile(const struct dirent *dirent, process_info_t *processI
 		char filePath[PATH_MAX];
 		sprintf(filePath, "%s/%s/cmdline", PROC_DIR_PATH, dirent->d_name);
 
-		report_error("argv", errno);
+		report_error(filePath, errno);
 		close(currentProcDirFd);
 		close(procDirFd);
 
@@ -267,7 +267,7 @@ static result_t HandleFile(const struct dirent *dirent, process_info_t *processI
 		char filePath[PATH_MAX];
 		sprintf(filePath, "%s/%s/environ", PROC_DIR_PATH, dirent->d_name);
 
-		report_error("envp", errno);
+		report_error(filePath, errno);
 		close(currentProcDirFd);
 		close(procDirFd);
 
