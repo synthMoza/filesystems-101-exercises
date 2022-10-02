@@ -245,7 +245,7 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 
 	if (!IS_OK(GetExe(currentProcDirFd, processInfo)))
 	{
-		fprintf(stderr, "Failed to get info on exe");
+		report_error("exe", errno);
 		close(currentProcDirFd);
 		close(procDirFd);
 
@@ -254,7 +254,7 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 
 	if (!IS_OK(GetArgv(currentProcDirFd, processInfo)))
 	{
-		fprintf(stderr, "Failed to get info on argv");
+		report_error("argv", errno);
 		close(currentProcDirFd);
 		close(procDirFd);
 
@@ -263,7 +263,7 @@ static result_t HandleFile(const struct dirent* dirent, process_info_t* processI
 
 	if (!IS_OK(GetEnvp(currentProcDirFd, processInfo)))
 	{
-		fprintf(stderr, "Failed to get info on envp");
+		report_error("envp", errno);
 		close(currentProcDirFd);
 		close(procDirFd);
 
