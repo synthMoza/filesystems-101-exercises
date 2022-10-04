@@ -1,12 +1,6 @@
 #include <process_info.h>
 #include <stdlib.h>
 
-static void DestroyArray(char** argv)
-{
-    free(*argv); // we allocate the whole string and set pointers for argv
-    free(argv);    
-}
-
 void DestroyProcessInfo(process_info_t* processInfo)
 {
 	if (!processInfo)
@@ -16,8 +10,14 @@ void DestroyProcessInfo(process_info_t* processInfo)
 		free(processInfo->exe);
 	
     if (processInfo->argv)
-        DestroyArray(processInfo->argv);
+        free(processInfo->argv);
+
+    if (processInfo->argvString)
+        free(processInfo->argvString);
 
     if (processInfo->envp)
-        DestroyArray(processInfo->envp);
+        free(processInfo->envp);
+
+    if (processInfo->envpString)
+        free(processInfo->envpString);
 }
