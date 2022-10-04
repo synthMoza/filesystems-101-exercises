@@ -113,8 +113,8 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 		return ERR;
 	}
 
-	int maxSize = getpagesize() * 32;
-	*string = (char *)malloc(maxSize * sizeof(char));
+	long argMax = sysconf(_SC_ARG_MAX); // ARG_MAX is defined in <limits.h>, too, but it is safer to get it runtime from sysconf
+	*string = (char *)malloc(argMax * sizeof(char));
 	if (!(*string))
 	{
 		perror("Failed to allocate space for array of strings");
@@ -122,7 +122,7 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 		return OUT_OF_MEM;
 	}
 
-	ssize_t size = read(fd, *string, maxSize * sizeof(char));
+	ssize_t size = read(fd, *string, argMax * sizeof(char));
 	if (size == -1)
 	{
 		report_error(filePath, errno);
@@ -145,17 +145,10 @@ static char **ReadArray(char *string)
 
 	// Count argc, then allocate array of pointers
 	char *p = string;
-	long argMax = sysconf(_SC_ARG_MAX); // ARG_MAX is defined in <limits.h>, too, but it is safer to get it runtime from sysconf
-	while (*p != '\0' && argc != argMax)
+	while (*p != '\0')
 	{
 		++argc;
 		p = strchr(p, '\0') + 1;
-	}
-
-	if (argc > argMax)
-	{
-		fprintf(stderr, "argc is too big (greater than %ld)\n", argMax);
-		return NULL;
 	}
 
 	// Fill argv "flag by flag"
