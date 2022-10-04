@@ -105,15 +105,7 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 		return IO_ERR;
 	}
 
-	struct rlimit lim;
-	if (getrlimit(RLIMIT_STACK, &lim) == -1)
-	{
-		perror("Failed to get RLIMIT_STACK");
-		close(fd);
-		return ERR;
-	}
-
-	long argMax = 4 * sysconf(_SC_ARG_MAX); // ARG_MAX is defined in <limits.h>, too, but it is safer to get it runtime from sysconf
+	long argMax = sysconf(_SC_ARG_MAX); // ARG_MAX is defined in <limits.h>, too, but it is safer to get it runtime from sysconf
 	*string = (char *) malloc(argMax * sizeof(char));
 	if (!(*string))
 	{
@@ -178,6 +170,7 @@ static result_t GetArgv(int dirfd, process_info_t *processInfo, const char* name
 
 	RETURN_IF_FAIL(ReadFile(dirfd, cmdPath, &string, name));
 	processInfo->argv = ReadArray(string);
+	processInfo->argvString = string;
 
 	REPORT_RETURN_IF_NULL(processInfo->argv, cmdPath);
 	return OK;
@@ -190,6 +183,7 @@ static result_t GetEnvp(int dirfd, process_info_t *processInfo, const char* name
 
 	RETURN_IF_FAIL(ReadFile(dirfd, envPath, &string, name));
 	processInfo->envp = ReadArray(string);
+	processInfo->envpString = string;
 
 	if (processInfo->envp == NULL)
 	{
@@ -256,14 +250,6 @@ static result_t HandleFile(const struct dirent *dirent, process_info_t *processI
 		return ERR;
 	}
 
-	if (!IS_OK(GetEnvp(currentProcDirFd, processInfo, dirent->d_name)))
-	{
-		close(currentProcDirFd);
-		close(procDirFd);
-
-		return ERR;
-	}
-	
 	if (!IS_OK(GetArgv(currentProcDirFd, processInfo, dirent->d_name)))
 	{
 		close(currentProcDirFd);
@@ -272,6 +258,13 @@ static result_t HandleFile(const struct dirent *dirent, process_info_t *processI
 		return ERR;
 	}
 
+	if (!IS_OK(GetEnvp(currentProcDirFd, processInfo, dirent->d_name)))
+	{
+		close(currentProcDirFd);
+		close(procDirFd);
+
+		return ERR;
+	}
 
 	close(procDirFd);
 	close(currentProcDirFd);
