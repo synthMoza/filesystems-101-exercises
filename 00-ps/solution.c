@@ -105,14 +105,6 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 		return IO_ERR;
 	}
 
-	/*
-		According to man 2 execve: "On kernel 2.6.23 and later, most architectures support a size
-		limit derived from the soft RLIMIT_STACK resource limit (see
-		getrlimit(2)) that is in force at the time of the execve() call."
-
-		Also, use so-called "soft" limit to save some memory
-	*/
-
 	struct rlimit lim;
 	if (getrlimit(RLIMIT_STACK, &lim) == -1)
 	{
@@ -121,7 +113,8 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 		return ERR;
 	}
 
-	*string = (char *)malloc(lim.rlim_cur * sizeof(char));
+	int maxSize = getpagesize() * 32;
+	*string = (char *)malloc(maxSize * sizeof(char));
 	if (!(*string))
 	{
 		perror("Failed to allocate space for array of strings");
@@ -129,7 +122,7 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 		return OUT_OF_MEM;
 	}
 
-	ssize_t size = read(fd, *string, lim.rlim_cur * sizeof(char));
+	ssize_t size = read(fd, *string, maxSize * sizeof(char));
 	if (size == -1)
 	{
 		report_error(filePath, errno);
@@ -316,9 +309,6 @@ void ps(void)
 		report_process(processInfo.pid, processInfo.exe, processInfo.argv, processInfo.envp);
 		DestroyProcessInfo(&processInfo);
 	}
-
-	// if (errno != 0)
-	// 	report_error(PROC_DIR_PATH, errno);
 
 	closedir(procDir);
 }
