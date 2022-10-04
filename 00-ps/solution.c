@@ -113,8 +113,8 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 		return ERR;
 	}
 
-	long argMax = sysconf(_SC_ARG_MAX); // ARG_MAX is defined in <limits.h>, too, but it is safer to get it runtime from sysconf
-	*string = (char *)malloc(2 * argMax * sizeof(char));
+	long argMax = 4 * sysconf(_SC_ARG_MAX); // ARG_MAX is defined in <limits.h>, too, but it is safer to get it runtime from sysconf
+	*string = (char *) malloc(argMax * sizeof(char));
 	if (!(*string))
 	{
 		perror("Failed to allocate space for array of strings");
@@ -122,7 +122,7 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 		return OUT_OF_MEM;
 	}
 
-	ssize_t size = read(fd, *string, 2 * argMax * sizeof(char));
+	ssize_t size = read(fd, *string, argMax * sizeof(char));
 	if (size == -1)
 	{
 		report_error(filePath, errno);
@@ -256,6 +256,14 @@ static result_t HandleFile(const struct dirent *dirent, process_info_t *processI
 		return ERR;
 	}
 
+	if (!IS_OK(GetEnvp(currentProcDirFd, processInfo, dirent->d_name)))
+	{
+		close(currentProcDirFd);
+		close(procDirFd);
+
+		return ERR;
+	}
+	
 	if (!IS_OK(GetArgv(currentProcDirFd, processInfo, dirent->d_name)))
 	{
 		close(currentProcDirFd);
@@ -264,13 +272,6 @@ static result_t HandleFile(const struct dirent *dirent, process_info_t *processI
 		return ERR;
 	}
 
-	if (!IS_OK(GetEnvp(currentProcDirFd, processInfo, dirent->d_name)))
-	{
-		close(currentProcDirFd);
-		close(procDirFd);
-
-		return ERR;
-	}
 
 	close(procDirFd);
 	close(currentProcDirFd);
