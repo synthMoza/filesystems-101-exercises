@@ -114,7 +114,7 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 	}
 
 	long argMax = sysconf(_SC_ARG_MAX); // ARG_MAX is defined in <limits.h>, too, but it is safer to get it runtime from sysconf
-	*string = (char *)malloc(argMax * sizeof(char));
+	*string = (char *)malloc(2 * argMax * sizeof(char));
 	if (!(*string))
 	{
 		perror("Failed to allocate space for array of strings");
@@ -122,7 +122,7 @@ static result_t ReadFile(int dirfd, const char *name, char **string, const char*
 		return OUT_OF_MEM;
 	}
 
-	ssize_t size = read(fd, *string, argMax * sizeof(char));
+	ssize_t size = read(fd, *string, 2 * argMax * sizeof(char));
 	if (size == -1)
 	{
 		report_error(filePath, errno);
@@ -191,7 +191,12 @@ static result_t GetEnvp(int dirfd, process_info_t *processInfo, const char* name
 	RETURN_IF_FAIL(ReadFile(dirfd, envPath, &string, name));
 	processInfo->envp = ReadArray(string);
 
-	REPORT_RETURN_IF_NULL(processInfo->envp, envPath);
+	if (processInfo->envp == NULL)
+	{
+		free(string);
+		return IO_ERR;
+	}
+
 	return OK;
 }
 
