@@ -317,8 +317,8 @@ void ps(void)
 		DestroyProcessInfo(&processInfo);
 	}
 
-	if (errno != 0)
-		report_error(PROC_DIR_PATH, errno);
+	// if (errno != 0)
+	// 	report_error(PROC_DIR_PATH, errno);
 
 	closedir(procDir);
 }
