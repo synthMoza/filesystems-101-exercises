@@ -44,6 +44,10 @@ static int helloworld_getattr(const char *path, struct stat *stbuf, struct fuse_
 		stbuf->st_mode = S_IFREG | 0400;
 		stbuf->st_nlink = 1;
 		stbuf->st_size = 64; // it is OK to report the size of "hello" that does not match the content.
+		stbuf->st_uid = getuid();
+		stbuf->st_gid = getgid();
+		stbuf->st_blocks = 0;
+		stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = time(NULL);
 	}
 
 	return res;
@@ -57,7 +61,7 @@ static int helloworld_readdir(const char *path, void *buf, fuse_fill_dir_t fille
 	(void) flags;
 
 	if (strcmp(path, "/") != 0)
-		return -EROFS;
+		return -ENOENT;
 	
 	filler(buf, ".", NULL, 0, 0);
 	filler(buf, "..", NULL, 0, 0);
@@ -69,7 +73,7 @@ static int helloworld_readdir(const char *path, void *buf, fuse_fill_dir_t fille
 static int helloworld_open(const char *path, struct fuse_file_info *fi)
 {
 	if (strcmp(path + 1, filename) != 0)
-		return -EROFS;
+		return -ENOENT;
 
 	int current_flags = fi->flags & O_ACCMODE;
 	if (current_flags != O_RDONLY)
@@ -83,7 +87,7 @@ static int helloworld_read(const char *path, char *buf, size_t size, off_t offse
 {
 	(void) fi;
 	if(strcmp(path + 1, filename) != 0)
-		return -EROFS;
+		return -ENOENT;
 
 	struct fuse_context* ctx = fuse_get_context();
 	sprintf(content, "hello, %d\n", ctx->pid);
@@ -92,7 +96,7 @@ static int helloworld_read(const char *path, char *buf, size_t size, off_t offse
 		if (offset + ((long) size) > len)
 			size = len - offset;
 		memcpy(buf, content + offset, size);
-	} 
+	}
 	else
 	{
 		size = 0;
@@ -113,6 +117,15 @@ static int helloworld_write(const char* path, const char* buf, size_t size, off_
 	return -EROFS; // no write operations
 }
 
+static int helloworld_truncate(const char* path, off_t offset, struct fuse_file_info *fi)
+{
+	(void) path;
+	(void) offset;
+	(void) fi;
+
+	return -EROFS;
+}
+
 static void helloworld_destroy(void *private_data)
 {
 	(void) private_data;
@@ -126,6 +139,7 @@ static const struct fuse_operations hellofs_ops = {
 	.open = helloworld_open,
 	.read = helloworld_read,
 	.write = helloworld_write,
+	.truncate = helloworld_truncate,
 	.destroy = helloworld_destroy
 };
 
