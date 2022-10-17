@@ -71,12 +71,9 @@ static int helloworld_open(const char *path, struct fuse_file_info *fi)
 	if (strcmp(path + 1, filename) != 0)
 		return -ENOENT;
 
-	(void) fi;
-	if (!access(path, R_OK))
+	int current_flags = fi->flags & O_ACCMODE;
+	if (current_flags != O_RDONLY)
 		return -EROFS;
-	// int current_flags = fi->flags & O_ACCMODE;
-	// if (current_flags != O_RDONLY)
-	// 	return -EROFS;
 
 	return 0;
 }
