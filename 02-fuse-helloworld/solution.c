@@ -101,6 +101,18 @@ static int helloworld_read(const char *path, char *buf, size_t size, off_t offse
 	return size;
 }
 
+static int helloworld_write(const char* path, const char* buf, size_t size, off_t offset,
+				struct fuse_file_info *fi)
+{
+	(void) path;
+	(void) buf;
+	(void) size;
+	(void) offset;
+	(void) fi;
+
+	return -EROFS; // no write operations
+}
+
 static void helloworld_destroy(void *private_data)
 {
 	(void) private_data;
@@ -113,6 +125,7 @@ static const struct fuse_operations hellofs_ops = {
 	.readdir = helloworld_readdir,
 	.open = helloworld_open,
 	.read = helloworld_read,
+	.write = helloworld_write,
 	.destroy = helloworld_destroy
 };
 
