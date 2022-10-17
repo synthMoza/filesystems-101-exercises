@@ -135,6 +135,50 @@ static int helloworld_create(const char* path, mode_t mode, struct fuse_file_inf
 	return -EROFS;
 }
 
+static int helloworld_rename(const char* path, const char* new_name, unsigned int flags)
+{
+	(void) path;
+	(void) new_name;
+	(void) flags;
+
+	return -EROFS;
+}
+
+static int helloworld_setxattr(const char* path, const char* name, const char* value, size_t size, int flags)
+{
+	(void) path;
+	(void) name;
+	(void) flags;
+	(void) value;
+	(void) size;
+	(void) flags;
+
+	return -EROFS;
+}
+static int helloworld_removexattr(const char* path, const char* name)
+{
+	(void) path;
+	(void) name;
+
+	return -EROFS;
+}
+
+static int helloworld_access(const char* path, int mode)
+{
+	(void)path;
+
+	if ((mode & W_OK) != 0)
+		return -EROFS;
+
+	return 0;
+}
+
+static int helloworld_unlink(const char* path)
+{
+	(void)path;
+	return -EROFS;
+}
+
 static void helloworld_destroy(void *private_data)
 {
 	(void) private_data;
@@ -150,6 +194,11 @@ static const struct fuse_operations hellofs_ops = {
 	.write = helloworld_write,
 	.truncate = helloworld_truncate,
 	.create = helloworld_create,
+	.rename = helloworld_rename,
+	.setxattr = helloworld_setxattr,
+	.removexattr = helloworld_removexattr,
+	.access = helloworld_access,
+	.unlink = helloworld_unlink,
 	.destroy = helloworld_destroy
 };
 
