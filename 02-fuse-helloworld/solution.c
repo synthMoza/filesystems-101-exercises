@@ -18,6 +18,11 @@ static void* helloworld_init(struct fuse_conn_info *conn, struct fuse_config *cf
 	(void) cfg;
 
 	cfg->kernel_cache = 1;
+	cfg->uid = getgid();
+	cfg->set_gid = 1;
+	cfg->gid = getgid();
+	cfg->set_mode = 1;
+	cfg->umask = ~S_IRUSR;
 
 	content = (char*) malloc(64 * sizeof(char));
 	if (!content)
@@ -36,18 +41,18 @@ static int helloworld_getattr(const char *path, struct stat *stbuf, struct fuse_
 	// two possible values - "/" or filename
 	if (strcmp(path, "/") == 0)
 	{
-		stbuf->st_mode = S_IFDIR | 0775;
+		stbuf->st_mode = S_IFDIR | S_IRUSR;
 		stbuf->st_nlink = 2;
 	}
 	else if (strcmp(path + 1, filename) == 0)
 	{
-		stbuf->st_mode = S_IFREG | 0400;
+		stbuf->st_mode = S_IFREG | S_IRUSR;
 		stbuf->st_nlink = 1;
 		stbuf->st_size = 64; // it is OK to report the size of "hello" that does not match the content.
-		stbuf->st_uid = getuid();
-		stbuf->st_gid = getgid();
-		stbuf->st_blocks = 0;
-		stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = time(NULL);
+	}
+	else
+	{
+		res = -ENOENT;
 	}
 
 	return res;
@@ -72,12 +77,12 @@ static int helloworld_readdir(const char *path, void *buf, fuse_fill_dir_t fille
 
 static int helloworld_open(const char *path, struct fuse_file_info *fi)
 {
-	if (strcmp(path + 1, filename) != 0)
-		return -ENOENT;
-
 	int current_flags = fi->flags & O_ACCMODE;
 	if (current_flags != O_RDONLY)
 		return -EROFS;
+	
+	if (strcmp(path + 1, filename) != 0)
+		return -ENOENT;
 
 	return 0;
 }
@@ -165,7 +170,7 @@ static int helloworld_removexattr(const char* path, const char* name)
 
 static int helloworld_access(const char* path, int mode)
 {
-	(void)path;
+	(void) path;
 
 	if ((mode & W_OK) != 0)
 		return -EROFS;
@@ -175,7 +180,7 @@ static int helloworld_access(const char* path, int mode)
 
 static int helloworld_unlink(const char* path)
 {
-	(void)path;
+	(void) path;
 	return -EROFS;
 }
 
