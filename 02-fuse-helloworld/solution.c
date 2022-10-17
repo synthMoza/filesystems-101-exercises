@@ -86,16 +86,17 @@ static int helloworld_read(const char *path, char *buf, size_t size, off_t offse
 		return ENOENT;
 
 	sprintf(content, "hello, %d\n", getpid());
-	long len = (long) strlen(content);
-	if (offset < len) {
-		if (offset + ((long) size) > len)
-			size = len - offset;
-		memcpy(buf, content + offset, size);
-	} 
-	else
-	{
-		size = 0;
-	}
+	memcpy(buf, content + offset, size);
+	// long len = (long) strlen(content);
+	// if (offset < len) {
+	// 	if (offset + ((long) size) > len)
+	// 		size = len - offset;
+	// 	memcpy(buf, content + offset, size);
+	// } 
+	// else
+	// {
+	// 	size = 0;
+	// }
 
 	return size;
 }
