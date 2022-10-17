@@ -21,8 +21,6 @@ static void* helloworld_init(struct fuse_conn_info *conn, struct fuse_config *cf
 	if (!content)
 		exit(-ENOMEM);
 
-	sprintf(content, "hello, %d\n", getpid());
-
 	return NULL;
 }
 
@@ -84,6 +82,7 @@ static int helloworld_read(const char *path, char *buf, size_t size, off_t offse
 	if(strcmp(path + 1, filename) != 0)
 		return -ENOENT;
 
+	sprintf(content, "hello, %d\n", getpid());
 	long len = (long) strlen(content);
 	if (offset < len) {
 		if (offset + (long) size > len)
