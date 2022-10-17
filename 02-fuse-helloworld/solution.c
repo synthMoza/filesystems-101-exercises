@@ -55,7 +55,7 @@ static int helloworld_readdir(const char *path, void *buf, fuse_fill_dir_t fille
 	(void) flags;
 
 	if (strcmp(path, "/") != 0)
-		return -ENOENT;
+		return ENOENT;
 	
 	filler(buf, ".", NULL, 0, 0);
 	filler(buf, "..", NULL, 0, 0);
@@ -67,10 +67,13 @@ static int helloworld_readdir(const char *path, void *buf, fuse_fill_dir_t fille
 static int helloworld_open(const char *path, struct fuse_file_info *fi)
 {
 	if (strcmp(path + 1, filename) != 0)
-		return -ENOENT;
+		return ENOENT;
 
-	if ((fi->flags & O_ACCMODE) != O_RDONLY)
-		return -EACCES;
+	int current_flag = fi->flags & O_ACCMODE;
+	if (current_flag == O_WRONLY || current_flag == O_RDWR)
+		return EROFS;
+	if (current_flag != O_RDONLY)
+		return EACCES;
 
 	return 0;
 }
@@ -80,16 +83,19 @@ static int helloworld_read(const char *path, char *buf, size_t size, off_t offse
 {
 	(void) fi;
 	if(strcmp(path + 1, filename) != 0)
-		return -ENOENT;
+		return ENOENT;
 
 	sprintf(content, "hello, %d\n", getpid());
 	long len = (long) strlen(content);
 	if (offset < len) {
-		if (offset + (long) size > len)
+		if (offset + ((long) size) > len)
 			size = len - offset;
 		memcpy(buf, content + offset, size);
-	} else
+	} 
+	else
+	{
 		size = 0;
+	}
 
 	return size;
 }
