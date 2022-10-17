@@ -126,6 +126,15 @@ static int helloworld_truncate(const char* path, off_t offset, struct fuse_file_
 	return -EROFS;
 }
 
+static int helloworld_create(const char* path, mode_t mode, struct fuse_file_info *fi)
+{
+	(void) path;
+	(void) mode;
+	(void) fi;
+
+	return -EROFS;
+}
+
 static void helloworld_destroy(void *private_data)
 {
 	(void) private_data;
@@ -140,6 +149,7 @@ static const struct fuse_operations hellofs_ops = {
 	.read = helloworld_read,
 	.write = helloworld_write,
 	.truncate = helloworld_truncate,
+	.create = helloworld_create,
 	.destroy = helloworld_destroy
 };
 
