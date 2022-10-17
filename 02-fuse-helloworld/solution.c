@@ -17,9 +17,11 @@ static void* helloworld_init(struct fuse_conn_info *conn, struct fuse_config *cf
 	(void) conn;
 	(void) cfg;
 
+	cfg->kernel_cache = 1;
+
 	content = (char*) malloc(64 * sizeof(char));
 	if (!content)
-		exit(-ENOMEM);
+		exit(ENOMEM);
 
 	return NULL;
 }
@@ -39,9 +41,9 @@ static int helloworld_getattr(const char *path, struct stat *stbuf, struct fuse_
 	}
 	else if (strcmp(path + 1, filename) == 0)
 	{
-		stbuf->st_mode = S_IFREG | 0444;
+		stbuf->st_mode = S_IFREG | 0400;
 		stbuf->st_nlink = 1;
-		stbuf->st_size = 0; // it is OK to report the size of "hello" that does not match the content.
+		stbuf->st_size = 64; // it is OK to report the size of "hello" that does not match the content.
 	}
 
 	return res;
@@ -85,18 +87,18 @@ static int helloworld_read(const char *path, char *buf, size_t size, off_t offse
 	if(strcmp(path + 1, filename) != 0)
 		return ENOENT;
 
-	sprintf(content, "hello, %d\n", getpid());
-	memcpy(buf, content + offset, size);
-	// long len = (long) strlen(content);
-	// if (offset < len) {
-	// 	if (offset + ((long) size) > len)
-	// 		size = len - offset;
-	// 	memcpy(buf, content + offset, size);
-	// } 
-	// else
-	// {
-	// 	size = 0;
-	// }
+	struct fuse_context* ctx = fuse_get_context();
+	sprintf(content, "hello, %d\n", ctx->pid);
+	long len = (long) strlen(content);
+	if (offset < len) {
+		if (offset + ((long) size) > len)
+			size = len - offset;
+		memcpy(buf, content + offset, size);
+	} 
+	else
+	{
+		size = 0;
+	}
 
 	return size;
 }
