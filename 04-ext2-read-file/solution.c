@@ -143,6 +143,7 @@ int dump_file(int img, int inode_nr, int out)
 		}
 		else
 		{
+			free(blockBuffer);
 			return -1; // unsupported
 		}
 	}
