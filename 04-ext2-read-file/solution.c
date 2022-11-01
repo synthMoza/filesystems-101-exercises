@@ -62,6 +62,11 @@ int dump_file(int img, int inode_nr, int out)
 	unsigned currentSize = inodeStruct.i_size;
 	ssize_t writeSize = 0;
 	
+	if (groupDesc.bg_inode_table == 0)
+	{
+		return -errno;
+	}
+
 	for (unsigned i = 0; i < EXT2_N_BLOCKS && currentSize > 0; ++i)
 	{
 		// seek to this block
@@ -69,11 +74,6 @@ int dump_file(int img, int inode_nr, int out)
 		if (offset != inodeStruct.i_block[i] *  blockSize)
 		{
 			free(blockBuffer);
-			return -errno;
-		}
-
-		if (inodeStruct.i_block[i] == 0)
-		{
 			return -errno;
 		}
 
