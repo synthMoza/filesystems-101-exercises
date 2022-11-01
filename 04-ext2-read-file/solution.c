@@ -7,7 +7,6 @@
 
 // list of defines
 #define BASE_OFFSET 1024 // zero block group offset
-#define BLOCK_OFFSET(block, blockSize) (BASE_OFFSET + block * blockSize) // get offset of the certain block
 
 // list of macros
 #define RETURN_IF_FAIL(res)		\
@@ -36,20 +35,30 @@ int dump_file(int img, int inode_nr, int out)
 	int blockGroupNumber = (inode_nr - 1) / superBlock.s_inodes_per_group;
 	int index = (inode_nr - 1) % superBlock.s_inodes_per_group;
 
-	// seek to this block and needed header inside it
-	// unsigned int groupCount = 1 + (superBlock.s_blocks_count - 1) / superBlock.s_blocks_per_group;
-	// unsigned int descrListSize = groupCount * sizeof(struct ext2_group_desc);
-	offset = lseek(img, BASE_OFFSET + sizeof(superBlock) + blockGroupNumber * sizeof(struct ext2_group_desc), SEEK_SET);
-	RETURN_IF_FALSE((unsigned) offset == BLOCK_OFFSET(blockGroupNumber, blockSize) + sizeof(superBlock) + blockGroupNumber * sizeof(struct ext2_group_desc));
+	// seek&read block groups header
 
-	// read block groups header
+	/*
+		blockSize = 1024: [boot] 1024, superBlock [1024], groupDesc [...]
+		blockSize > 1024: [boot] 1024, superBlock [1024], free space [...], groupDesc [...] alligned to next block 
+	*/
+	
+	unsigned groupDescBlock = (blockSize > 1024) ? 1 : 2;
+	offset = lseek(img, groupDescBlock * blockSize, SEEK_SET);
+	RETURN_IF_FALSE(offset == groupDescBlock * blockSize);
+	
 	struct ext2_group_desc groupDesc;
 	readSize = read(img, &groupDesc, sizeof(groupDesc));
 	RETURN_IF_FALSE(readSize == sizeof(groupDesc));
 
+	// seek to this block and needed header inside it
+	// unsigned int groupCount = 1 + (superBlock.s_blocks_count - 1) / superBlock.s_blocks_per_group;
+	// unsigned int descrListSize = groupCount * sizeof(struct ext2_group_desc);
+	offset = lseek(img, groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc), SEEK_SET);
+	RETURN_IF_FALSE((unsigned) offset == groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc));
+
 	// read inode struct
-	offset = lseek(img, BLOCK_OFFSET(groupDesc.bg_inode_table, blockSize) + index * sizeof(struct ext2_inode), SEEK_SET);
-	RETURN_IF_FALSE((unsigned) offset == BLOCK_OFFSET(groupDesc.bg_inode_table, blockSize) + index * sizeof(struct ext2_inode));
+	offset = lseek(img, groupDesc.bg_inode_table * blockSize + index * sizeof(struct ext2_inode), SEEK_SET);
+	RETURN_IF_FALSE((unsigned) offset == groupDesc.bg_inode_table * blockSize + index * sizeof(struct ext2_inode));
 
 	struct ext2_inode inodeStruct;
 	readSize = read(img, &inodeStruct, sizeof(inodeStruct));
@@ -62,8 +71,8 @@ int dump_file(int img, int inode_nr, int out)
 	for (unsigned i = 0; i < EXT2_N_BLOCKS && currentSize > 0; ++i)
 	{
 		// seek to this block
-		offset = lseek(img, BLOCK_OFFSET(inodeStruct.i_block[i], blockSize), SEEK_SET);
-		RETURN_IF_FALSE(offset == BLOCK_OFFSET(inodeStruct.i_block[i], blockSize));
+		offset = lseek(img, inodeStruct.i_block[i] * blockSize, SEEK_SET);
+		RETURN_IF_FALSE(offset == inodeStruct.i_block[i] *  blockSize);
 
 		// read block into memory
 		readSize = read(img, blockBuffer, blockSize);
@@ -101,8 +110,8 @@ int dump_file(int img, int inode_nr, int out)
 			for (unsigned j = 0; j < blockSize / 4; ++j)
 			{
 				// seek to this block
-				offset = lseek(img, BLOCK_OFFSET(indirectBlock.idArray[j], blockSize), SEEK_SET);
-				RETURN_IF_FALSE(offset == BLOCK_OFFSET(indirectBlock.idArray[j], blockSize));
+				offset = lseek(img, indirectBlock.idArray[j] * blockSize, SEEK_SET);
+				RETURN_IF_FALSE(offset == indirectBlock.idArray[j] * blockSize);
 
 				// read block into memory
 				readSize = read(img, blockBufferIndirect, blockSize);
