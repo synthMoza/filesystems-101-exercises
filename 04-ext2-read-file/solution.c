@@ -68,10 +68,14 @@ int copyByInodeToFile(int img, unsigned blockSize, struct ext2_inode* inodeStruc
 
 	char* blockBuffer = (char*) malloc(blockSize);
 	unsigned currentSize = inodeStruct->i_size;
-	fprintf(stderr, "currentSize: %u", currentSize);
 	
 	for (unsigned i = 0; i < EXT2_N_BLOCKS && currentSize > 0; ++i)
 	{
+		if (inodeStruct->i_block[i] == 0)
+		{
+			return -errno;
+		}
+
 		// seek to this block
 		offset = lseek(img, inodeStruct->i_block[i] * blockSize, SEEK_SET);
 		if (offset != inodeStruct->i_block[i] *  blockSize)
