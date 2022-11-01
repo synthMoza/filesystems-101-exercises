@@ -72,6 +72,11 @@ int dump_file(int img, int inode_nr, int out)
 			return -errno;
 		}
 
+		if (inodeStruct.i_block[i] == 0)
+		{
+			return -errno;
+		}
+
 		// read block into memory
 		readSize = read(img, blockBuffer, blockSize);
 		if (readSize != blockSize)
