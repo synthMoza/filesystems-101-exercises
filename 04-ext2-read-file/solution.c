@@ -73,7 +73,9 @@ int copyByInodeToFile(int img, unsigned blockSize, struct ext2_inode* inodeStruc
 	{
 		if (inodeStruct->i_block[i] == 0)
 		{
-			return -errno;
+			// terminate sign
+			free(blockBuffer);
+			return 0;
 		}
 
 		// seek to this block
