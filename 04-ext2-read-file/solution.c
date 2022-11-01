@@ -77,6 +77,10 @@ int dump_file(int img, int inode_nr, int out)
 			free(blockBuffer);
 			return -errno;
 		}
+		if (offset == 0)
+		{
+			return -errno;
+		}
 
 		// read block into memory
 		readSize = read(img, blockBuffer, blockSize);
