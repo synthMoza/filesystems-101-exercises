@@ -17,61 +17,63 @@
 	if (!(res))					\
 		return -errno;			\
 
-int dump_file(int img, int inode_nr, int out)
+int readSuperBlock(int img, struct ext2_super_block* superBlock)
 {
+	if (!superBlock)
+		return -1;
+
 	// seek to the actual start of the zero block
 	off_t offset = lseek(img, BASE_OFFSET, SEEK_SET);
 	RETURN_IF_FALSE(offset == BASE_OFFSET);
 
 	// read super block from the zero block
-	struct ext2_super_block superBlock = {};
-	ssize_t readSize = read(img, &superBlock, sizeof(superBlock));
+	ssize_t readSize = read(img, superBlock, sizeof(*superBlock));
 	RETURN_IF_FALSE(readSize == sizeof(superBlock));
 
-	// calculate size of block group
-	unsigned blockSize = 1024 << superBlock.s_log_block_size;
+	return 0;
+}
 
-	// calculate block group number where inode is located
-	int blockGroupNumber = (inode_nr - 1) / superBlock.s_inodes_per_group;
-	int index = (inode_nr - 1) % superBlock.s_inodes_per_group;
-
-	// seek&read block groups header
-
+int readGroupDesc(int img, unsigned blockSize, unsigned blockGroupNumber, struct ext2_group_desc* groupDesc)
+{
 	/*
 		blockSize = 1024: [boot] 1024, superBlock [1024], groupDesc [...]
 		blockSize > 1024: [boot] 1024, superBlock [1024], free space [...], groupDesc [...] alligned to next block 
 	*/
-	
 	unsigned groupDescBlock = (blockSize > 1024) ? 1 : 2;
-	offset = lseek(img, groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc), SEEK_SET);
+	off_t offset = lseek(img, groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc), SEEK_SET);
 	RETURN_IF_FALSE((unsigned) offset == groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc));	
 	
-	struct ext2_group_desc groupDesc;
-	readSize = read(img, &groupDesc, sizeof(groupDesc));
+	ssize_t readSize = read(img, groupDesc, sizeof(*groupDesc));
 	RETURN_IF_FALSE(readSize == sizeof(groupDesc));
 
-	// read inode struct
-	offset = lseek(img, groupDesc.bg_inode_table * blockSize + index * sizeof(struct ext2_inode), SEEK_SET);
-	RETURN_IF_FALSE((unsigned) offset == groupDesc.bg_inode_table * blockSize + index * sizeof(struct ext2_inode));
+	return 0;
+}
 
-	struct ext2_inode inodeStruct;
-	readSize = read(img, &inodeStruct, sizeof(inodeStruct));
-	RETURN_IF_FALSE(readSize == sizeof(inodeStruct));
+int readInode(int img, unsigned blockSize, unsigned index, struct ext2_group_desc* groupDesc, struct ext2_inode* inodeStruct)
+{
+	off_t offset = lseek(img, groupDesc->bg_inode_table * blockSize + index * sizeof(struct ext2_inode), SEEK_SET);
+	RETURN_IF_FALSE((unsigned) offset == groupDesc->bg_inode_table * blockSize + index * sizeof(struct ext2_inode));
+
+	ssize_t readSize = read(img, inodeStruct, sizeof(*inodeStruct));
+	RETURN_IF_FALSE(readSize == sizeof(*inodeStruct));
+
+	return 0;
+}
+
+int copyByInodeToFile(int img, unsigned blockSize, struct ext2_inode* inodeStruct, int out)
+{
+	ssize_t readSize = 0;
+	ssize_t writeSize = 0;
+	off_t offset = 0;
 
 	char* blockBuffer = (char*) malloc(blockSize);
-	unsigned currentSize = inodeStruct.i_size;
-	ssize_t writeSize = 0;
+	unsigned currentSize = inodeStruct->i_size;
 	
-	if (groupDesc.bg_inode_table == 0)
-	{
-		return -errno;
-	}
-
 	for (unsigned i = 0; i < EXT2_N_BLOCKS && currentSize > 0; ++i)
 	{
 		// seek to this block
-		offset = lseek(img, inodeStruct.i_block[i] * blockSize, SEEK_SET);
-		if (offset != inodeStruct.i_block[i] *  blockSize)
+		offset = lseek(img, inodeStruct->i_block[i] * blockSize, SEEK_SET);
+		if (offset != inodeStruct->i_block[i] *  blockSize)
 		{
 			free(blockBuffer);
 			return -errno;
@@ -150,5 +152,27 @@ int dump_file(int img, int inode_nr, int out)
 	}
 
 	free(blockBuffer);
+
+	return 0;
+}
+
+int dump_file(int img, int inode_nr, int out)
+{
+	struct ext2_super_block superBlock = {};
+	RETURN_IF_FAIL(readSuperBlock(img, &superBlock));
+
+	unsigned blockSize = 1024 << superBlock.s_log_block_size;
+
+	// calculate block group number where inode is located
+	unsigned blockGroupNumber = (inode_nr - 1) / superBlock.s_inodes_per_group;
+	unsigned index = (inode_nr - 1) % superBlock.s_inodes_per_group;
+
+	struct ext2_group_desc groupDesc;
+	RETURN_IF_FAIL(readGroupDesc(img, blockSize, blockGroupNumber, &groupDesc));
+
+	struct ext2_inode inodeStruct;
+	RETURN_IF_FAIL(readInode(img, blockSize, index, &groupDesc, &inodeStruct));
+
+	RETURN_IF_FAIL(copyByInodeToFile(img, blockSize, &inodeStruct, out));
 	return 0;
 }
