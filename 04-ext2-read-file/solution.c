@@ -64,26 +64,24 @@ int dump_file(int img, int inode_nr, int out)
 	readSize = read(img, &inodeStruct, sizeof(inodeStruct));
 	RETURN_IF_FALSE(readSize == sizeof(inodeStruct));
 
-	unsigned currentSize = inodeStruct.i_size;
 	char* blockBuffer = (char*) malloc(blockSize);
+	unsigned currentSize = inodeStruct.i_size;
 	ssize_t writeSize = 0;
 	
 	for (unsigned i = 0; i < EXT2_N_BLOCKS && currentSize > 0; ++i)
 	{
 		// seek to this block
 		offset = lseek(img, inodeStruct.i_block[i] * blockSize, SEEK_SET);
-		if (offset != inodeStruct.i_block[i] *  blockSize)
-		{
-			free(blockBuffer);
-			return -errno;
-		}
-		// RETURN_IF_FALSE(offset == inodeStruct.i_block[i] *  blockSize);
+		RETURN_IF_FALSE(offset == inodeStruct.i_block[i] *  blockSize);
+
+		void* a = malloc(1024);
+		(void) a;
 
 		// read block into memory
 		readSize = read(img, blockBuffer, blockSize);
 		RETURN_IF_FALSE(readSize == blockSize);
 
-		void* b = malloc(1);
+		void* b = malloc(1024);
 		(void) b;
 
 		// direct blocks
