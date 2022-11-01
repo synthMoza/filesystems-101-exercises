@@ -43,18 +43,12 @@ int dump_file(int img, int inode_nr, int out)
 	*/
 	
 	unsigned groupDescBlock = (blockSize > 1024) ? 1 : 2;
-	offset = lseek(img, groupDescBlock * blockSize, SEEK_SET);
-	RETURN_IF_FALSE(offset == groupDescBlock * blockSize);
+	offset = lseek(img, groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc), SEEK_SET);
+	RETURN_IF_FALSE((unsigned) offset == groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc));	
 	
 	struct ext2_group_desc groupDesc;
 	readSize = read(img, &groupDesc, sizeof(groupDesc));
 	RETURN_IF_FALSE(readSize == sizeof(groupDesc));
-
-	// seek to this block and needed header inside it
-	// unsigned int groupCount = 1 + (superBlock.s_blocks_count - 1) / superBlock.s_blocks_per_group;
-	// unsigned int descrListSize = groupCount * sizeof(struct ext2_group_desc);
-	offset = lseek(img, groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc), SEEK_SET);
-	RETURN_IF_FALSE((unsigned) offset == groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc));
 
 	// read inode struct
 	offset = lseek(img, groupDesc.bg_inode_table * blockSize + index * sizeof(struct ext2_inode), SEEK_SET);
@@ -75,10 +69,6 @@ int dump_file(int img, int inode_nr, int out)
 		if (offset != inodeStruct.i_block[i] *  blockSize)
 		{
 			free(blockBuffer);
-			return -errno;
-		}
-		if (offset == 0)
-		{
 			return -errno;
 		}
 
