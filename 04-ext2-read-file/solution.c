@@ -68,6 +68,7 @@ int copyByInodeToFile(int img, unsigned blockSize, struct ext2_inode* inodeStruc
 
 	char* blockBuffer = (char*) malloc(blockSize);
 	unsigned currentSize = inodeStruct->i_size;
+	fprintf(stderr, "currentSize: %u", currentSize);
 	
 	for (unsigned i = 0; i < EXT2_N_BLOCKS && currentSize > 0; ++i)
 	{
