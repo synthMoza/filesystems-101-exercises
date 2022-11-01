@@ -49,10 +49,10 @@ int readGroupDesc(int img, unsigned blockSize, unsigned blockGroupNumber, struct
 	return 0;
 }
 
-int readInode(int img, unsigned blockSize, unsigned index, struct ext2_group_desc* groupDesc, struct ext2_inode* inodeStruct)
+int readInode(int img, unsigned blockSize, unsigned index, struct ext2_group_desc* groupDesc, struct ext2_inode* inodeStruct, size_t inodeSize)
 {
-	off_t offset = lseek(img, groupDesc->bg_inode_table * blockSize + index * sizeof(struct ext2_inode), SEEK_SET);
-	RETURN_IF_FALSE((unsigned) offset == groupDesc->bg_inode_table * blockSize + index * sizeof(struct ext2_inode));
+	off_t offset = lseek(img, groupDesc->bg_inode_table * blockSize + index * inodeSize, SEEK_SET);
+	RETURN_IF_FALSE((unsigned) offset == groupDesc->bg_inode_table * blockSize + index * inodeSize);
 
 	ssize_t readSize = read(img, inodeStruct, sizeof(*inodeStruct));
 	RETURN_IF_FALSE(readSize == sizeof(*inodeStruct));
@@ -165,16 +165,8 @@ int copyByInodeToFile(int img, unsigned blockSize, struct ext2_inode* inodeStruc
 
 int dump_file(int img, int inode_nr, int out)
 {
-
 	struct ext2_super_block superBlock = {};
 	RETURN_IF_FAIL(readSuperBlock(img, &superBlock));
-
-	if (sizeof(struct ext2_inode) != superBlock.s_inode_size)
-	{
-		char* a = malloc(23);
-		(void) a;
-		return -1;
-	}
 
 	unsigned blockSize = 1024 << superBlock.s_log_block_size;
 
@@ -186,7 +178,7 @@ int dump_file(int img, int inode_nr, int out)
 	RETURN_IF_FAIL(readGroupDesc(img, blockSize, blockGroupNumber, &groupDesc));
 
 	struct ext2_inode inodeStruct;
-	RETURN_IF_FAIL(readInode(img, blockSize, index, &groupDesc, &inodeStruct));
+	RETURN_IF_FAIL(readInode(img, blockSize, index, &groupDesc, &inodeStruct, superBlock.s_inode_size));
 
 	RETURN_IF_FAIL(copyByInodeToFile(img, blockSize, &inodeStruct, out));
 	return 0;
