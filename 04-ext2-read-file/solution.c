@@ -64,8 +64,10 @@ int dump_file(int img, int inode_nr, int out)
 	readSize = read(img, &inodeStruct, sizeof(inodeStruct));
 	RETURN_IF_FALSE(readSize == sizeof(inodeStruct));
 
-	char* blockBuffer = (char*) malloc(blockSize);
 	unsigned currentSize = inodeStruct.i_size;
+	if (currentSize == 0)
+		return 0;
+	char* blockBuffer = (char*) malloc(blockSize);
 	ssize_t writeSize = 0;
 	
 	for (unsigned i = 0; i < EXT2_N_BLOCKS && currentSize > 0; ++i)
