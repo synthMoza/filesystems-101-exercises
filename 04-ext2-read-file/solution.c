@@ -60,100 +60,117 @@ int readInode(int img, unsigned blockSize, unsigned index, struct ext2_group_des
 	return 0;
 }
 
+int readBlock(int img, unsigned blockNumber, unsigned blockSize, char* blockBuffer)
+{
+	// seek to this block
+	off_t offset = lseek(img, blockNumber * blockSize, SEEK_SET);
+	RETURN_IF_FALSE(offset == blockNumber *  blockSize)
+
+	// read block into memory
+	ssize_t readSize = read(img, blockBuffer, blockSize);
+	RETURN_IF_FALSE(readSize == blockSize);
+
+	return 0;
+}
+
+int readAndCopy(int img, unsigned blockNumber, unsigned blockSize, char* blockBuffer, int out, unsigned* currentSize)
+{
+	RETURN_IF_FAIL(readBlock(img, blockNumber, blockSize, blockBuffer));
+	
+	// write to out
+	if (*currentSize > blockSize)
+	{
+		ssize_t writeSize = write(out, blockBuffer, blockSize);
+		RETURN_IF_FALSE(writeSize == blockSize);
+		*currentSize -= blockSize;
+	}
+	else
+	{
+		ssize_t writeSize = write(out, blockBuffer, *currentSize);
+		RETURN_IF_FALSE(writeSize == *currentSize);
+		*currentSize = 0;
+	}
+
+	return 0;
+}
+
+int readAndCopyIndirect(int img, unsigned blockNumber, unsigned blockSize, char* blockBuffer, int out, unsigned* currentSize)
+{
+	RETURN_IF_FAIL(readBlock(img, blockNumber, blockSize, blockBuffer));
+
+	union IndirectBlock
+	{
+		char* rawBuffer;
+		int32_t* idArray; 
+	} indirectBlock;
+
+	indirectBlock.rawBuffer = blockBuffer;
+	char* blockBufferIndirect = (char*) malloc(blockSize);
+
+	for (unsigned j = 0; j < blockSize / 4 && *currentSize > 0; ++j)
+	{
+		if (indirectBlock.idArray[j] == 0)
+			break; // terminate
+		
+		RETURN_IF_FAIL(readAndCopy(img, indirectBlock.idArray[j], blockSize, blockBufferIndirect, out, currentSize));
+	}
+
+	free(blockBufferIndirect);
+	return 0;
+}
+
+int readAndCopyDIndirect(int img, unsigned blockNumber, unsigned blockSize, char* blockBuffer, int out, unsigned* currentSize)
+{
+	RETURN_IF_FAIL(readBlock(img, blockNumber, blockSize, blockBuffer));
+
+	union IndirectBlock
+	{
+		char* rawBuffer;
+		int32_t* idArray; 
+	} indirectBlock;
+
+	indirectBlock.rawBuffer = blockBuffer;
+	char* blockBufferIndirect = (char*) malloc(blockSize);
+
+	for (unsigned j = 0; j < blockSize / 4 && *currentSize > 0; ++j)
+	{
+		if (indirectBlock.idArray[j] == 0)
+			break; // terminate
+		
+		RETURN_IF_FAIL(readAndCopyIndirect(img, indirectBlock.idArray[j], blockSize, blockBufferIndirect, out, currentSize));
+	}
+
+	free(blockBufferIndirect);
+	return 0;
+}
+
 int copyByInodeToFile(int img, unsigned blockSize, struct ext2_inode* inodeStruct, int out)
 {
-	ssize_t readSize = 0;
-	ssize_t writeSize = 0;
-	off_t offset = 0;
-
 	char* blockBuffer = (char*) malloc(blockSize);
 	unsigned currentSize = inodeStruct->i_size;
 	
 	for (unsigned i = 0; i < EXT2_N_BLOCKS && currentSize > 0; ++i)
 	{
 		if (inodeStruct->i_block[i] == 0)
-		{
-			// terminate sign
-			free(blockBuffer);
-			return 0;
-		}
-
-		// seek to this block
-		offset = lseek(img, inodeStruct->i_block[i] * blockSize, SEEK_SET);
-		if (offset != inodeStruct->i_block[i] *  blockSize)
-		{
-			free(blockBuffer);
-			return -errno;
-		}
-
-		// read block into memory
-		readSize = read(img, blockBuffer, blockSize);
-		if (readSize != blockSize)
-		{
-			free(blockBuffer);
-			return -errno;
-		}
+			break; // terminate
 
 		// direct blocks
 		if (i < EXT2_NDIR_BLOCKS)
 		{
-			// write to out
-			if (currentSize > blockSize)
-			{
-				writeSize = write(out, blockBuffer, blockSize);
-				RETURN_IF_FALSE(writeSize == blockSize);
-				currentSize -= blockSize;
-			}
-			else
-			{
-				writeSize = write(out, blockBuffer, currentSize);
-				RETURN_IF_FALSE(writeSize == currentSize);
-				currentSize = 0;
-				break; // done
-			}
+			RETURN_IF_FAIL(readAndCopy(img, inodeStruct->i_block[i], blockSize, blockBuffer, out, &currentSize));
 		}
 		else if (i == EXT2_IND_BLOCK)
 		{
-			// first indirect
-			union IndirectBlock
-			{
-				char* rawBuffer;
-				int32_t* idArray; 
-			} indirectBlock;
-
-			indirectBlock.rawBuffer = blockBuffer;
-			char* blockBufferIndirect = (char*) malloc(blockSize);
-			for (unsigned j = 0; j < blockSize / 4; ++j)
-			{
-				// seek to this block
-				offset = lseek(img, indirectBlock.idArray[j] * blockSize, SEEK_SET);
-				RETURN_IF_FALSE(offset == indirectBlock.idArray[j] * blockSize);
-
-				// read block into memory
-				readSize = read(img, blockBufferIndirect, blockSize);
-				RETURN_IF_FALSE(readSize == blockSize);
-
-				// write to out
-				if (currentSize > blockSize)
-				{
-					writeSize = write(out, blockBufferIndirect, blockSize);
-					RETURN_IF_FALSE(writeSize == blockSize);
-					currentSize -= blockSize;
-				}
-				else
-				{
-					writeSize = write(out, blockBufferIndirect, currentSize);
-					RETURN_IF_FALSE(writeSize == currentSize);
-					currentSize = 0;
-					break; // done
-				}
-			}
-
-			free(blockBufferIndirect);
+			RETURN_IF_FAIL(readAndCopyIndirect(img, inodeStruct->i_block[i], blockSize, blockBuffer, out, &currentSize));
+		}
+		else if (i == EXT2_DIND_BLOCK)
+		{
+			RETURN_IF_FAIL(readAndCopyDIndirect(img, inodeStruct->i_block[i], blockSize, blockBuffer, out, &currentSize));
 		}
 		else
 		{
 			free(blockBuffer);
+
 			return -1; // unsupported
 		}
 	}
