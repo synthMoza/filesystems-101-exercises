@@ -72,17 +72,19 @@ int dump_file(int img, int inode_nr, int out)
 	{
 		// seek to this block
 		offset = lseek(img, inodeStruct.i_block[i] * blockSize, SEEK_SET);
-		RETURN_IF_FALSE(offset == inodeStruct.i_block[i] *  blockSize);
-
-		void* a = malloc(1024);
-		(void) a;
+		if (offset != inodeStruct.i_block[i] *  blockSize)
+		{
+			free(blockBuffer);
+			return -errno;
+		}
 
 		// read block into memory
 		readSize = read(img, blockBuffer, blockSize);
-		RETURN_IF_FALSE(readSize == blockSize);
-
-		void* b = malloc(1024);
-		(void) b;
+		if (readSize != blockSize)
+		{
+			free(blockBuffer);
+			return -errno;
+		}
 
 		// direct blocks
 		if (i < EXT2_NDIR_BLOCKS)
