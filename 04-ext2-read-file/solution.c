@@ -165,8 +165,16 @@ int copyByInodeToFile(int img, unsigned blockSize, struct ext2_inode* inodeStruc
 
 int dump_file(int img, int inode_nr, int out)
 {
+
 	struct ext2_super_block superBlock = {};
 	RETURN_IF_FAIL(readSuperBlock(img, &superBlock));
+
+	if (sizeof(struct ext2_inode) != superBlock.s_inode_size)
+	{
+		char* a = malloc(23);
+		(void) a;
+		return -1;
+	}
 
 	unsigned blockSize = 1024 << superBlock.s_log_block_size;
 
