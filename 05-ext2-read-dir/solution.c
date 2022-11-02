@@ -91,10 +91,11 @@ char getFileType(unsigned char fileType)
 	}
 }
 
-int readDirBlock(const char *blockBuffer)
+int readDirBlock(unsigned blockSize, const char *blockBuffer)
 {
 	// get first dir entry
-	struct ext2_dir_entry_2 *dirEntry = (struct ext2_dir_entry_2 *)blockBuffer;
+	struct ext2_dir_entry_2 *dirEntry = (struct ext2_dir_entry_2 *) blockBuffer;
+	unsigned offset = 0;
 
 	// traverse to all dir entries
 	while (dirEntry->inode != 0)
@@ -102,6 +103,10 @@ int readDirBlock(const char *blockBuffer)
 		report_file(dirEntry->inode, getFileType(dirEntry->file_type), dirEntry->name);
 		// move to the nexty directory
 		blockBuffer += dirEntry->rec_len;
+		offset += dirEntry->rec_len;
+
+		if (offset >= blockSize)
+			break;
 		dirEntry = (struct ext2_dir_entry_2 *)blockBuffer;
 	}
 
@@ -126,7 +131,7 @@ int readDirBlockIndirect(unsigned blockSize, const char *blockBuffer)
 		if (indirectBlock.idArray[j] == 0)
 			break; // terminate
 
-		RETURN_IF_FAIL(readDirBlock(blockBufferIndirect));
+		RETURN_IF_FAIL(readDirBlock(blockSize, blockBufferIndirect));
 	}
 
 	free(blockBufferIndirect);
@@ -186,7 +191,7 @@ int readDirectory(int img, unsigned blockSize, const struct ext2_inode *inodeStr
 		// direct blocks
 		if (i < EXT2_NDIR_BLOCKS)
 		{
-			RETURN_IF_FAIL(readDirBlock(blockBuffer));
+			RETURN_IF_FAIL(readDirBlock(blockSize, blockBuffer));
 		}
 		else if (i == EXT2_IND_BLOCK)
 		{
