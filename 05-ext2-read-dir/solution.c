@@ -105,7 +105,9 @@ int readDirBlock(unsigned blockSize, const char *blockBuffer)
 		memcpy(fileName, dirEntry->name, dirEntry->name_len);
 		fileName[dirEntry->name_len] = '\0';
 
-		report_file(dirEntry->inode, getFileType(dirEntry->file_type), fileName);
+		if (strcmp(fileName, ".") != 0 && strcmp(fileName, "..") != 0)
+			report_file(dirEntry->inode, getFileType(dirEntry->file_type), fileName);
+
 		// move to the nexty directory
 		blockBuffer += dirEntry->rec_len;
 		offset += dirEntry->rec_len;
