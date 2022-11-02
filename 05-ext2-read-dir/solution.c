@@ -97,10 +97,15 @@ int readDirBlock(unsigned blockSize, const char *blockBuffer)
 	struct ext2_dir_entry_2 *dirEntry = (struct ext2_dir_entry_2 *) blockBuffer;
 	unsigned offset = 0;
 
+	char fileName[EXT2_NAME_LEN + 1] = {};
+
 	// traverse to all dir entries
 	while (dirEntry->inode != 0)
 	{
-		report_file(dirEntry->inode, getFileType(dirEntry->file_type), dirEntry->name);
+		memcpy(fileName, dirEntry->name, dirEntry->name_len);
+		fileName[dirEntry->name_len] = '\0';
+
+		report_file(dirEntry->inode, getFileType(dirEntry->file_type), fileName);
 		// move to the nexty directory
 		blockBuffer += dirEntry->rec_len;
 		offset += dirEntry->rec_len;
