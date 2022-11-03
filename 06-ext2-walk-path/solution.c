@@ -35,20 +35,27 @@ int BlockVisitor(struct ext2_access* access, char* block, void* data)
 
 int dump_file(int img, const char *path, int out)
 {
+	int res = 0;
+	int inode_nr = 0;
 	struct ext2_access* access = Create(img);
 
-	int inode_nr = 0;
-	RETURN_IF_FAIL(GetInodeNumberByPath(access, path, &inode_nr));
-	
+	res = GetInodeNumberByPath(access, path, &inode_nr);
+	if (res < 0)
+		return res;
+
 	struct ext2_inode inode = {};
-	RETURN_IF_FAIL(GetInodeStruct(access, inode_nr, &inode));
+	res = GetInodeStruct(access, inode_nr, &inode);
+	if (res < 0)
+		return res;
 
 	struct visitor_data data = {
 		.currentSize = inode.i_size,
 		.out = out
 	};
 
-	RETURN_IF_FAIL(IterateFileBlocksByInode(access, inode_nr, BlockVisitor, (void*) &data));
+	res = IterateFileBlocksByInode(access, inode_nr, BlockVisitor, (void*) &data);
+	if (res < 0)
+		return res;
 
 	Destroy(access);
 	return 0;
