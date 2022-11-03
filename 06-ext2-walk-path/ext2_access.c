@@ -3,7 +3,7 @@
 struct ext2_access
 {
     int m_img; // filesystem img descriptor
-    struct ext2_super_block* m_superBlock;
+    struct ext2_super_block *m_superBlock;
 };
 
 // Helper defines
@@ -11,146 +11,172 @@ struct ext2_access
 #define NAME_MAX 255
 // ----------------------------------------------------------
 
-
 // Static helper functions
 // ----------------------------------------------------------
 
 static int ReadSuperBlock(int img, struct ext2_super_block *superBlock)
 {
-	if (!superBlock)
-		return -1;
+    if (!superBlock)
+        return -1;
 
-	// seek to the actual start of the zero block
-	off_t offset = lseek(img, SUPERBLOCK_OFFSET, SEEK_SET);
-	RETURN_IF_FALSE(offset == SUPERBLOCK_OFFSET);
+    // seek to the actual start of the zero block
+    off_t offset = lseek(img, SUPERBLOCK_OFFSET, SEEK_SET);
+    RETURN_IF_FALSE(offset == SUPERBLOCK_OFFSET);
 
-	// read super block from the zero block
-	ssize_t readSize = read(img, superBlock, sizeof(*superBlock));
-	RETURN_IF_FALSE(readSize == sizeof(superBlock));
+    // read super block from the zero block
+    ssize_t readSize = read(img, superBlock, sizeof(*superBlock));
+    RETURN_IF_FALSE(readSize == sizeof(superBlock));
 
-	return 0;
+    return 0;
 }
 
-static int GetGroupDesc(struct ext2_access* access, unsigned blockGroupNumber, struct ext2_group_desc* groupDesc)
+static int GetGroupDesc(struct ext2_access *access, unsigned blockGroupNumber, struct ext2_group_desc *groupDesc)
 {
     /*
-		blockSize = 1024: [boot] 1024, superBlock [1024], groupDesc [...]
-		blockSize > 1024: [boot] 1024, superBlock [1024], free space [...], groupDesc [...] alligned to next block
-	*/
+        blockSize = 1024: [boot] 1024, superBlock [1024], groupDesc [...]
+        blockSize > 1024: [boot] 1024, superBlock [1024], free space [...], groupDesc [...] alligned to next block
+    */
 
     unsigned blockSize = GetBlockSize(access);
-	unsigned groupDescBlock = (blockSize > 1024) ? 1 : 2;
-	off_t offset = lseek(access->m_img, groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc), SEEK_SET);
-	RETURN_IF_FALSE((unsigned)offset == groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc));
+    unsigned groupDescBlock = (blockSize > 1024) ? 1 : 2;
+    off_t offset = lseek(access->m_img, groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc), SEEK_SET);
+    RETURN_IF_FALSE((unsigned)offset == groupDescBlock * blockSize + blockGroupNumber * sizeof(struct ext2_group_desc));
 
-	ssize_t readSize = read(access->m_img, groupDesc, sizeof(*groupDesc));
-	RETURN_IF_FALSE(readSize == sizeof(groupDesc));
+    ssize_t readSize = read(access->m_img, groupDesc, sizeof(*groupDesc));
+    RETURN_IF_FALSE(readSize == sizeof(groupDesc));
 
-	return 0;
+    return 0;
 }
 
-static int ReadBlock(struct ext2_access* access, unsigned blockNumber, char* blockBuffer)
+static int ReadBlock(struct ext2_access *access, unsigned blockNumber, char *blockBuffer)
 {
     // seek to this block
     unsigned blockSize = GetBlockSize(access);
 
-	off_t offset = lseek(access->m_img, blockNumber * blockSize, SEEK_SET);
-	RETURN_IF_FALSE(offset == blockNumber * blockSize)
+    off_t offset = lseek(access->m_img, blockNumber * blockSize, SEEK_SET);
+    RETURN_IF_FALSE(offset == blockNumber * blockSize)
 
-	// read block into memory
-	ssize_t readSize = read(access->m_img, blockBuffer, blockSize);
-	RETURN_IF_FALSE(readSize == blockSize);
+    // read block into memory
+    ssize_t readSize = read(access->m_img, blockBuffer, blockSize);
+    RETURN_IF_FALSE(readSize == blockSize);
 
-	return 0;
+    return 0;
 }
 
 union IndirectBlock
 {
-	const char *rawBuffer;
-	int32_t *idArray;
+    const char *rawBuffer;
+    int32_t *idArray;
 };
 
-static int IterateIndirectBlock(struct ext2_access* access, char* blockBuffer, block_visitor visitor, void* data)
+static int IterateIndirectBlock(struct ext2_access *access, char *blockBuffer, block_visitor visitor, void *data)
 {
     union IndirectBlock indirectBlock;
 
-	indirectBlock.rawBuffer = blockBuffer;
+    indirectBlock.rawBuffer = blockBuffer;
     unsigned blockSize = GetBlockSize(access);
 
-	char *blockBufferIndirect = (char *) malloc(blockSize);
-	for (unsigned j = 0; j < blockSize / 4; ++j)
-	{
-		if (indirectBlock.idArray[j] == 0)
-			break; // terminate
+    char *blockBufferIndirect = (char *)malloc(blockSize);
+    for (unsigned j = 0; j < blockSize / 4; ++j)
+    {
+        if (indirectBlock.idArray[j] == 0)
+            break; // terminate
 
-		RETURN_IF_FAIL(ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect));
-		RETURN_IF_FAIL(visitor(access, blockBufferIndirect, data));
-	}
+        if (ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect) < 0)
+        {
+            free(blockBufferIndirect);
+            return -errno;
+        }
 
-	free(blockBufferIndirect);
-	return 0;
+        if (visitor(access, blockBufferIndirect, data) < 0)
+        {
+            free(blockBufferIndirect);
+            return -errno;
+        }
+    }
+
+    free(blockBufferIndirect);
+    return 0;
 }
 
-static int IterateDIndirectBlock(struct ext2_access* access, char* blockBuffer, block_visitor visitor, void* data)
+static int IterateDIndirectBlock(struct ext2_access *access, char *blockBuffer, block_visitor visitor, void *data)
 {
     union IndirectBlock indirectBlock;
 
-	indirectBlock.rawBuffer = blockBuffer;
+    indirectBlock.rawBuffer = blockBuffer;
     unsigned blockSize = GetBlockSize(access);
 
-	char *blockBufferIndirect = (char *) malloc(blockSize);
-	for (unsigned j = 0; j < blockSize / 4; ++j)
-	{
-		if (indirectBlock.idArray[j] == 0)
-			break; // terminate
+    char *blockBufferIndirect = (char *)malloc(blockSize);
+    for (unsigned j = 0; j < blockSize / 4; ++j)
+    {
+        if (indirectBlock.idArray[j] == 0)
+            break; // terminate
 
-		RETURN_IF_FAIL(ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect));
-		RETURN_IF_FAIL(IterateIndirectBlock(access, blockBufferIndirect, visitor, data));
-	}
+        if (ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect) < 0)
+        {
+            free(blockBufferIndirect);
+            return -errno;
+        }
 
-	free(blockBufferIndirect);
-	return 0;
+        if (IterateIndirectBlock(access, blockBufferIndirect, visitor, data) < 0)
+        {
+            free(blockBufferIndirect);
+            return -errno;
+        }
+    }
+
+    free(blockBufferIndirect);
+    return 0;
 }
 
-static int IterateTIndirectBlock(struct ext2_access* access, char* blockBuffer, block_visitor visitor, void* data)
+static int IterateTIndirectBlock(struct ext2_access *access, char *blockBuffer, block_visitor visitor, void *data)
 {
     union IndirectBlock indirectBlock;
 
-	indirectBlock.rawBuffer = blockBuffer;
+    indirectBlock.rawBuffer = blockBuffer;
     unsigned blockSize = GetBlockSize(access);
 
-	char *blockBufferIndirect = (char *) malloc(blockSize);
-	for (unsigned j = 0; j < blockSize / 4; ++j)
-	{
-		if (indirectBlock.idArray[j] == 0)
-			break; // terminate
+    char *blockBufferIndirect = (char *)malloc(blockSize);
+    for (unsigned j = 0; j < blockSize / 4; ++j)
+    {
+        if (indirectBlock.idArray[j] == 0)
+            break; // terminate
 
-		RETURN_IF_FAIL(ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect));
-		RETURN_IF_FAIL(IterateDIndirectBlock(access, blockBufferIndirect, visitor, data));
-	}
+        if (ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect) < 0)
+        {
+            free(blockBufferIndirect);
+            return -errno;
+        }
 
-	free(blockBufferIndirect);
-	return 0;
+        if (IterateDIndirectBlock(access, blockBufferIndirect, visitor, data) < 0)
+        {
+            free(blockBufferIndirect);
+            return -errno;
+        }
+    }
+
+    free(blockBufferIndirect);
+    return 0;
 }
 
 struct DirToFindEntryByNameStruct
 {
-    const char* name;
+    const char *name;
     unsigned length;
     int out;
 };
 
-static int VisitDirToFindEntryByName(struct ext2_access* access, char* block, void* data)
+static int VisitDirToFindEntryByName(struct ext2_access *access, char *block, void *data)
 {
-    struct DirToFindEntryByNameStruct* fileData = (struct DirToFindEntryByNameStruct*) data;
+    struct DirToFindEntryByNameStruct *fileData = (struct DirToFindEntryByNameStruct *)data;
 
     // get first dir entry
-	struct ext2_dir_entry_2 *dirEntry = (struct ext2_dir_entry_2 *) block;
-	unsigned leftToRead = GetBlockSize(access);
+    struct ext2_dir_entry_2 *dirEntry = (struct ext2_dir_entry_2 *)block;
+    unsigned leftToRead = GetBlockSize(access);
 
-	// traverse to all dir entries
-	while (leftToRead && dirEntry->inode != 0)
-	{
+    // traverse to all dir entries
+    while (leftToRead && dirEntry->inode != 0)
+    {
         if (strncmp(dirEntry->name, fileData->name, fileData->length) == 0 &&
             dirEntry->name_len == fileData->length)
         {
@@ -159,38 +185,38 @@ static int VisitDirToFindEntryByName(struct ext2_access* access, char* block, vo
             break;
         }
 
-		// move to the nexty directory
-		block += dirEntry->rec_len;
-		leftToRead -= dirEntry->rec_len;
+        // move to the nexty directory
+        block += dirEntry->rec_len;
+        leftToRead -= dirEntry->rec_len;
 
-		dirEntry = (struct ext2_dir_entry_2 *) block;
-	}
+        dirEntry = (struct ext2_dir_entry_2 *)block;
+    }
 
-	return 0;
+    return 0;
 }
 
-static int GetInodeByNameInDir(struct ext2_access* access, int srcInode, const char* fileName, unsigned length)
+static int GetInodeByNameInDir(struct ext2_access *access, int srcInode, const char *fileName, unsigned length)
 {
     struct DirToFindEntryByNameStruct dirData = {
         .name = fileName,
         .length = length,
         .out = 0,
     };
-    
-    RETURN_IF_FAIL(IterateFileBlocksByInode(access, srcInode, VisitDirToFindEntryByName, (void*) &dirData));
+
+    RETURN_IF_FAIL(IterateFileBlocksByInode(access, srcInode, VisitDirToFindEntryByName, (void *)&dirData));
     return dirData.out;
 }
 
 // ----------------------------------------------------------
 
-struct ext2_access* Create(int img)
+struct ext2_access *Create(int img)
 {
-    struct ext2_access* access = (struct ext2_access*) malloc(sizeof(*access));
+    struct ext2_access *access = (struct ext2_access *)malloc(sizeof(*access));
     if (!access)
         return NULL;
 
     access->m_img = img;
-    access->m_superBlock = (struct ext2_super_block*) malloc(sizeof(*access->m_superBlock));
+    access->m_superBlock = (struct ext2_super_block *)malloc(sizeof(*access->m_superBlock));
     if (!access->m_superBlock)
     {
         free(access);
@@ -209,31 +235,38 @@ struct ext2_access* Create(int img)
     return access;
 }
 
-unsigned GetBlockSize(struct ext2_access* access)
+unsigned GetBlockSize(struct ext2_access *access)
 {
     return 1024 << (access->m_superBlock->s_log_block_size);
 }
 
-int GetInodeNumberByPath(struct ext2_access* access, const char* path, int* inode_nr)
+int GetInodeNumberByPath(struct ext2_access *access, const char *path, int *inode_nr)
 {
     int srcInode = EXT2_ROOT_INO;
-    const char* pathPointer = path + 1;
-    
+    const char *pathPointer = path + 1;
+
     while (*pathPointer != '\0')
     {
-        const char* newPointer = strchr(pathPointer, '/');
+        // check if srcInode is a directory
+        struct ext2_inode srcInodeStr = {};
+        RETURN_IF_FAIL(GetInodeStruct(access, srcInode, &srcInodeStr));
+        if ((srcInodeStr.i_mode & LINUX_S_IFDIR) == 0)
+            return -ENOTDIR; // not a directory
+
+        // find next part of the path
+        const char *newPointer = strchr(pathPointer, '/');
         if (newPointer)
         {
             // directory
             char fileName[NAME_MAX] = {};
             strncpy(fileName, pathPointer, newPointer - pathPointer);
-            
+
             fileName[newPointer - pathPointer] = '\0';
             srcInode = GetInodeByNameInDir(access, srcInode, fileName, newPointer - pathPointer);
             if (srcInode == 0)
             {
                 // couldn't find entry
-                return -1;
+                return -ENOENT;
             }
         }
         else
@@ -242,13 +275,13 @@ int GetInodeNumberByPath(struct ext2_access* access, const char* path, int* inod
             char fileName[NAME_MAX] = {};
             unsigned length = strlen(pathPointer);
             strncpy(fileName, pathPointer, length);
-            
+
             fileName[length] = '\0';
             srcInode = GetInodeByNameInDir(access, srcInode, fileName, length);
             if (srcInode == 0)
             {
                 // couldn't find entry
-                return -1;
+                return -ENOENT;
             }
             else
             {
@@ -259,35 +292,35 @@ int GetInodeNumberByPath(struct ext2_access* access, const char* path, int* inod
         }
 
         pathPointer = newPointer + 1;
-    } 
+    }
 
     return 0;
 }
 
-int GetInodeStruct(struct ext2_access* access, int inode_nr, struct ext2_inode* inode)
+int GetInodeStruct(struct ext2_access *access, int inode_nr, struct ext2_inode *inode)
 {
     // calculate block group number where inode is located
-	unsigned blockGroupNumber = (inode_nr - 1) / access->m_superBlock->s_inodes_per_group;
-	unsigned index = (inode_nr - 1) % access->m_superBlock->s_inodes_per_group;
+    unsigned blockGroupNumber = (inode_nr - 1) / access->m_superBlock->s_inodes_per_group;
+    unsigned index = (inode_nr - 1) % access->m_superBlock->s_inodes_per_group;
 
     // get corresponding group desc
     struct ext2_group_desc groupDesc = {};
-	RETURN_IF_FAIL(GetGroupDesc(access, blockGroupNumber, &groupDesc));
+    RETURN_IF_FAIL(GetGroupDesc(access, blockGroupNumber, &groupDesc));
 
     // read inode struct
     unsigned blockSize = GetBlockSize(access);
     unsigned inodeSize = access->m_superBlock->s_inode_size;
 
     off_t offset = lseek(access->m_img, groupDesc.bg_inode_table * blockSize + index * inodeSize, SEEK_SET);
-	RETURN_IF_FALSE((unsigned) offset == groupDesc.bg_inode_table * blockSize + index * inodeSize);
+    RETURN_IF_FALSE((unsigned)offset == groupDesc.bg_inode_table * blockSize + index * inodeSize);
 
-	ssize_t readSize = read(access->m_img, inode, sizeof(*inode));
-	RETURN_IF_FALSE(readSize == sizeof(*inode));
+    ssize_t readSize = read(access->m_img, inode, sizeof(*inode));
+    RETURN_IF_FALSE(readSize == sizeof(*inode));
 
-	return 0;
+    return 0;
 }
 
-int IterateFileBlocksByInode(struct ext2_access* access, int inode_nr, block_visitor visitor, void* data)
+int IterateFileBlocksByInode(struct ext2_access *access, int inode_nr, block_visitor visitor, void *data)
 {
     if (!access)
         return -1;
@@ -296,49 +329,69 @@ int IterateFileBlocksByInode(struct ext2_access* access, int inode_nr, block_vis
     RETURN_IF_FAIL(GetInodeStruct(access, inode_nr, &inode));
 
     char *blockBuffer = (char *)malloc(GetBlockSize(access));
-	for (int i = 0; i < EXT2_N_BLOCKS; ++i)
-	{
-		if (inode.i_block[i] == 0)
-			break; // terminate
+    for (int i = 0; i < EXT2_N_BLOCKS; ++i)
+    {
+        if (inode.i_block[i] == 0)
+            break; // terminate
 
-		// read current block
-		RETURN_IF_FAIL(ReadBlock(access, inode.i_block[i], blockBuffer));
+        // read current block
+        if (ReadBlock(access, inode.i_block[i], blockBuffer) < 0)
+        {
+            free(blockBuffer);
+            return -errno;
+        }
 
-		// direct blocks
-		if (i < EXT2_NDIR_BLOCKS)
-		{
-			RETURN_IF_FAIL(visitor(access, blockBuffer, data));
-		}
-		else if (i == EXT2_IND_BLOCK)
-		{
-			RETURN_IF_FAIL(IterateIndirectBlock(access, blockBuffer, visitor, data));
-		}
-		else if (i == EXT2_DIND_BLOCK)
-		{
-			RETURN_IF_FAIL(IterateDIndirectBlock(access, blockBuffer, visitor, data));
-		}
-		else if (i == EXT2_TIND_BLOCK)
-		{
-			RETURN_IF_FAIL(IterateTIndirectBlock(access, blockBuffer, visitor, data));
-		}
-		else
-		{
-			free(blockBuffer);
-			return -1; // unknown block number
-		}
-	}
+        // direct blocks
+        if (i < EXT2_NDIR_BLOCKS)
+        {
+            if (visitor(access, blockBuffer, data) < 0)
+            {
+                free(blockBuffer);
+                return -errno;
+            }
+        }
+        else if (i == EXT2_IND_BLOCK)
+        {
+            if (IterateIndirectBlock(access, blockBuffer, visitor, data) < 0)
+            {
+                free(blockBuffer);
+                return -errno;
+            }
+        }
+        else if (i == EXT2_DIND_BLOCK)
+        {
+            if (IterateDIndirectBlock(access, blockBuffer, visitor, data) < 0)
+            {
+                free(blockBuffer);
+                return -errno;
+            }
+        }
+        else if (i == EXT2_TIND_BLOCK)
+        {
+            if (IterateTIndirectBlock(access, blockBuffer, visitor, data) < 0)
+            {
+                free(blockBuffer);
+                return -errno;
+            }
+        }
+        else
+        {
+            free(blockBuffer);
+            return -1; // unknown block number
+        }
+    }
 
-	free(blockBuffer);
-	return 0;
+    free(blockBuffer);
+    return 0;
 }
 
-void Destroy(struct ext2_access* access)
+void Destroy(struct ext2_access *access)
 {
     if (!access)
         return;
 
     if (access->m_superBlock)
         free(access->m_superBlock);
-    
+
     free(access);
 }
