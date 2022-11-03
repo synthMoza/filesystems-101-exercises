@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+
 # Written by synthMoza. All rights reserved. 2022
 #
 # Send exercises/check results via HTTP requests
@@ -18,6 +18,8 @@ fi
 exerciseName=$1
 
 curl -s -X POST $serverUrl/submit/$repositoryOwner/$exerciseName
+echo "Waiting for results..."
+sleep 5
 curl -s -X GET $serverUrl/results/$repositoryOwner/$exerciseName/last | jq > $outputFile
 cat $outputFile
 
