@@ -105,8 +105,7 @@ int readDirBlock(unsigned blockSize, const char *blockBuffer)
 		memcpy(fileName, dirEntry->name, dirEntry->name_len);
 		fileName[dirEntry->name_len] = '\0';
 
-		if (strcmp(fileName, ".") != 0 && strcmp(fileName, "..") != 0)
-			report_file(dirEntry->inode, getFileType(dirEntry->file_type), fileName);
+		report_file(dirEntry->inode, getFileType(dirEntry->file_type), fileName);
 
 		// move to the nexty directory
 		blockBuffer += dirEntry->rec_len;
@@ -247,3 +246,10 @@ int dump_dir(int img, int inode_nr)
 
 	return 0;
 }
+
+// for test
+// #include <stdio.h>
+// void report_file(int inode_nr, char type, const char *name)
+// {
+// 	printf("%d %c %s\n", inode_nr, type, name);
+// }
