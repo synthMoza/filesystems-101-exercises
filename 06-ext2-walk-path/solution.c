@@ -41,12 +41,18 @@ int dump_file(int img, const char *path, int out)
 
 	res = GetInodeNumberByPath(access, path, &inode_nr);
 	if (res < 0)
+	{
+		Destroy(access);
 		return res;
+	}
 
 	struct ext2_inode inode = {};
 	res = GetInodeStruct(access, inode_nr, &inode);
 	if (res < 0)
+	{
+		Destroy(access);
 		return res;
+	}
 
 	struct visitor_data data = {
 		.currentSize = inode.i_size,
@@ -55,7 +61,10 @@ int dump_file(int img, const char *path, int out)
 
 	res = IterateFileBlocksByInode(access, inode_nr, BlockVisitor, (void*) &data);
 	if (res < 0)
+	{
+		Destroy(access);
 		return res;
+	}
 
 	Destroy(access);
 	return 0;
