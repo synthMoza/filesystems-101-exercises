@@ -95,12 +95,12 @@ int readDirBlock(unsigned blockSize, const char *blockBuffer)
 {
 	// get first dir entry
 	struct ext2_dir_entry_2 *dirEntry = (struct ext2_dir_entry_2 *) blockBuffer;
-	unsigned offset = 0;
+	unsigned leftToRead = blockSize;
 
 	char fileName[EXT2_NAME_LEN + 1] = {};
 
 	// traverse to all dir entries
-	while (dirEntry->inode != 0)
+	while (leftToRead && dirEntry->inode != 0)
 	{
 		memcpy(fileName, dirEntry->name, dirEntry->name_len);
 		fileName[dirEntry->name_len] = '\0';
@@ -109,10 +109,8 @@ int readDirBlock(unsigned blockSize, const char *blockBuffer)
 
 		// move to the nexty directory
 		blockBuffer += dirEntry->rec_len;
-		offset += dirEntry->rec_len;
+		leftToRead -= dirEntry->rec_len;
 
-		if (offset >= blockSize)
-			break;
 		dirEntry = (struct ext2_dir_entry_2 *)blockBuffer;
 	}
 
@@ -125,7 +123,7 @@ union IndirectBlock
 	int32_t *idArray;
 };
 
-int readDirBlockIndirect(unsigned blockSize, const char *blockBuffer)
+int readDirBlockIndirect(int img, unsigned blockSize, const char *blockBuffer)
 {
 	union IndirectBlock indirectBlock;
 
@@ -137,6 +135,7 @@ int readDirBlockIndirect(unsigned blockSize, const char *blockBuffer)
 		if (indirectBlock.idArray[j] == 0)
 			break; // terminate
 
+		RETURN_IF_FAIL(readBlock(img, indirectBlock.idArray[j], blockSize, blockBufferIndirect));
 		RETURN_IF_FAIL(readDirBlock(blockSize, blockBufferIndirect));
 	}
 
@@ -144,7 +143,7 @@ int readDirBlockIndirect(unsigned blockSize, const char *blockBuffer)
 	return 0;
 }
 
-int readDirBlockDIndirect(unsigned blockSize, const char *blockBuffer)
+int readDirBlockDIndirect(int img, unsigned blockSize, const char *blockBuffer)
 {
 	union IndirectBlock indirectBlock;
 
@@ -156,14 +155,15 @@ int readDirBlockDIndirect(unsigned blockSize, const char *blockBuffer)
 		if (indirectBlock.idArray[j] == 0)
 			break; // terminate
 
-		RETURN_IF_FAIL(readDirBlockIndirect(blockSize, blockBufferIndirect));
+		RETURN_IF_FAIL(readBlock(img, indirectBlock.idArray[j], blockSize, blockBufferIndirect));
+		RETURN_IF_FAIL(readDirBlockIndirect(img, blockSize, blockBufferIndirect));
 	}
 
 	free(blockBufferIndirect);
 	return 0;
 }
 
-int readDirBlockTIndirect(unsigned blockSize, const char *blockBuffer)
+int readDirBlockTIndirect(int img, unsigned blockSize, const char *blockBuffer)
 {
 	union IndirectBlock indirectBlock;
 
@@ -175,7 +175,8 @@ int readDirBlockTIndirect(unsigned blockSize, const char *blockBuffer)
 		if (indirectBlock.idArray[j] == 0)
 			break; // terminate
 
-		RETURN_IF_FAIL(readDirBlockDIndirect(blockSize, blockBufferIndirect));
+		RETURN_IF_FAIL(readBlock(img, indirectBlock.idArray[j], blockSize, blockBufferIndirect));
+		RETURN_IF_FAIL(readDirBlockDIndirect(img, blockSize, blockBufferIndirect));
 	}
 
 	free(blockBufferIndirect);
@@ -186,7 +187,7 @@ int readDirectory(int img, unsigned blockSize, const struct ext2_inode *inodeStr
 {
 	char *blockBuffer = (char *)malloc(blockSize);
 
-	for (int i = 0; i < EXT2_NDIR_BLOCKS; ++i)
+	for (int i = 0; i < EXT2_N_BLOCKS; ++i)
 	{
 		if (inodeStruct->i_block[i] == 0)
 			break; // terminate
@@ -201,15 +202,15 @@ int readDirectory(int img, unsigned blockSize, const struct ext2_inode *inodeStr
 		}
 		else if (i == EXT2_IND_BLOCK)
 		{
-			RETURN_IF_FAIL(readDirBlockIndirect(blockSize, blockBuffer));
+			RETURN_IF_FAIL(readDirBlockIndirect(img, blockSize, blockBuffer));
 		}
 		else if (i == EXT2_DIND_BLOCK)
 		{
-			RETURN_IF_FAIL(readDirBlockDIndirect(blockSize, blockBuffer));
+			RETURN_IF_FAIL(readDirBlockDIndirect(img, blockSize, blockBuffer));
 		}
 		else if (i == EXT2_TIND_BLOCK)
 		{
-			RETURN_IF_FAIL(readDirBlockTIndirect(blockSize, blockBuffer));
+			RETURN_IF_FAIL(readDirBlockTIndirect(img, blockSize, blockBuffer));
 		}
 		else
 		{
@@ -233,10 +234,10 @@ int dump_dir(int img, int inode_nr)
 	unsigned blockGroupNumber = (inode_nr - 1) / superBlock.s_inodes_per_group;
 	unsigned index = (inode_nr - 1) % superBlock.s_inodes_per_group;
 
-	struct ext2_group_desc groupDesc;
+	struct ext2_group_desc groupDesc = {};
 	RETURN_IF_FAIL(readGroupDesc(img, blockSize, blockGroupNumber, &groupDesc));
 
-	struct ext2_inode inodeStruct;
+	struct ext2_inode inodeStruct = {};
 	RETURN_IF_FAIL(readInode(img, blockSize, index, &groupDesc, &inodeStruct, superBlock.s_inode_size));
 
 	if ((inodeStruct.i_mode & EXT2_S_IFDIR) == 0)
