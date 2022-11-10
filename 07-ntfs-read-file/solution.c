@@ -93,7 +93,8 @@ int dump_file(int img, const char *path, int out)
 	}
 
 	ntfs_attr_close(attr);
-
+	ntfs_inode_close(inode);
 	ntfs_umount(vol, FALSE);
+
 	return 0;
 }
