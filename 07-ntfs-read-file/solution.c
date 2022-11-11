@@ -41,10 +41,6 @@ int dump_file(int img, const char *path, int out)
 		return -1; // cant read file name
 
 	ntfs_volume *vol = NULL;
-
-	// char pathBuffer[PATH_MAX] = {0};
-	// sprintf(pathBuffer, "/proc/%d/fd/%d", getpid(), img);
-
 	vol = ntfs_mount(fileName, NTFS_MNT_RDONLY);
 	if (!vol)
 		return -1;
@@ -66,8 +62,8 @@ int dump_file(int img, const char *path, int out)
 	ntfs_attr* attr = ntfs_attr_open(inode, attrType, NULL, 0);
 	if (!attr)
 	{
-		// ntfs_inode_close(inode);
-		// ntfs_umount(vol, FALSE);
+		ntfs_inode_close(inode);
+		ntfs_umount(vol, FALSE);
 		return -1; // cant read data atribute
 	}
 
@@ -92,9 +88,9 @@ int dump_file(int img, const char *path, int out)
 
 		if (bytesRead < 0) 
 		{
-			ntfs_inode_close(inode);
-			ntfs_umount(vol, FALSE);
-			ntfs_attr_close(attr);
+			// ntfs_inode_close(inode);
+			// ntfs_umount(vol, FALSE);
+			// ntfs_attr_close(attr);
 			return -errno;
 		}
 
