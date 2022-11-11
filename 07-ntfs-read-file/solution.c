@@ -62,11 +62,13 @@ int dump_file(int img, const char *path, int out)
 	const unsigned bufferSize = 4096;
 	char buffer[bufferSize];
 
-	ntfschar* attrName = NULL;
+	// allocate buffer here, free outselves
+	ntfschar* attrName = (ntfschar*) malloc(PATH_MAX * sizeof(char));
 	ATTR_TYPES attrType = AT_DATA;
 	int attrLen = ntfs_mbstoucs("DATA", &attrName);
 	if (attrLen < 0)
 	{
+		free(attrName);
 		ntfs_umount(vol, FALSE);
 		return -1; // cant get attribute name
 	}
@@ -74,6 +76,7 @@ int dump_file(int img, const char *path, int out)
 	ntfs_attr* attr = ntfs_attr_open(inode, attrType, attrName, attrLen);
 	if (!attr)
 	{
+		free(attrName);
 		ntfs_umount(vol, FALSE);
 		return -1; // cant read data atribute
 	}
@@ -99,6 +102,7 @@ int dump_file(int img, const char *path, int out)
 
 		if (bytesRead < 0) 
 		{
+			free(attrName);
 			ntfs_umount(vol, FALSE);
 			ntfs_attr_close(attr);
 			return -errno;
@@ -110,6 +114,7 @@ int dump_file(int img, const char *path, int out)
 		written = write(out, buffer, bytesRead);
 		if (written != bytesRead)
 		{
+			free(attrName);
 			ntfs_umount(vol, FALSE);
 			ntfs_attr_close(attr);
 			return -errno;
@@ -118,6 +123,7 @@ int dump_file(int img, const char *path, int out)
 		offset += bytesRead;
 	}
 
+	free(attrName);
 	ntfs_attr_close(attr);
 	ntfs_inode_close(inode);
 	ntfs_umount(vol, FALSE);
