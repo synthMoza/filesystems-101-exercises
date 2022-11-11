@@ -14,21 +14,21 @@
 #include <ntfs-3g/volume.h>
 #include <ntfs-3g/dir.h>
 
-// int GetFileNameByFd(int fd, char* buffer)
-// {
-// 	if (!buffer)
-// 		return -1;
+int GetFileNameByFd(int fd, char* buffer)
+{
+	if (!buffer)
+		return -1;
 	
-// 	char pathBuffer[PATH_MAX] = {0};
-// 	sprintf(pathBuffer, "/proc/self/fd/%d", fd);
+	char pathBuffer[PATH_MAX] = {0};
+	sprintf(pathBuffer, "/proc/self/fd/%d", fd);
 
-// 	ssize_t size = readlink(pathBuffer, buffer, PATH_MAX);
-// 	if (size < 0)
-// 		return size;
+	ssize_t size = readlink(pathBuffer, buffer, PATH_MAX);
+	if (size < 0)
+		return size;
 	
-// 	buffer[size] = '\0';
-// 	return 0;
-// }
+	buffer[size] = '\0';
+	return 0;
+}
 
 int dump_file(int img, const char *path, int out)
 {
@@ -36,16 +36,16 @@ int dump_file(int img, const char *path, int out)
 	// maybe it can be done much more effectively
 
 	// get device/file name
-	// char fileName[PATH_MAX];
-	// if (GetFileNameByFd(img, fileName) < 0)
-	// 	return -1; // cant read file name
+	char fileName[PATH_MAX];
+	if (GetFileNameByFd(img, fileName) < 0)
+		return -1; // cant read file name
 
 	ntfs_volume *vol = NULL;
 
-	char pathBuffer[PATH_MAX] = {0};
-	sprintf(pathBuffer, "/proc/%d/fd/%d", getpid(), img);
+	// char pathBuffer[PATH_MAX] = {0};
+	// sprintf(pathBuffer, "/proc/%d/fd/%d", getpid(), img);
 
-	vol = ntfs_mount(pathBuffer, NTFS_MNT_RDONLY);
+	vol = ntfs_mount(fileName, NTFS_MNT_RDONLY);
 	if (!vol)
 		return -1;
 
