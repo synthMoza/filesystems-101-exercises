@@ -73,7 +73,10 @@ int dump_file(int img, const char *path, int out)
 
 	ntfs_attr* attr = ntfs_attr_open(inode, attrType, attrName, attrLen);
 	if (!attr)
+	{
+		ntfs_umount(vol, FALSE);
 		return -1; // cant read data atribute
+	}
 
 	u32 blockSize = 0;
 	if (inode->mft_no < 2)
@@ -95,14 +98,22 @@ int dump_file(int img, const char *path, int out)
 		}
 
 		if (bytesRead < 0) 
+		{
+			ntfs_umount(vol, FALSE);
+			ntfs_attr_close(attr);
 			return -errno;
+		}
 
 		if (!bytesRead)
 			break; // end
 
 		written = write(out, buffer, bytesRead);
 		if (written != bytesRead)
+		{
+			ntfs_umount(vol, FALSE);
+			ntfs_attr_close(attr);
 			return -errno;
+		}
 		
 		offset += bytesRead;
 	}
