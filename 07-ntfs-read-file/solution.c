@@ -69,6 +69,7 @@ int dump_file(int img, const char *path, int out)
 	if (attrLen < 0)
 	{
 		free(attrName);
+		ntfs_inode_close(inode);
 		ntfs_umount(vol, FALSE);
 		return -1; // cant get attribute name
 	}
@@ -77,6 +78,7 @@ int dump_file(int img, const char *path, int out)
 	if (!attr)
 	{
 		free(attrName);
+		ntfs_inode_close(inode);
 		ntfs_umount(vol, FALSE);
 		return -1; // cant read data atribute
 	}
@@ -103,6 +105,7 @@ int dump_file(int img, const char *path, int out)
 		if (bytesRead < 0) 
 		{
 			free(attrName);
+			ntfs_inode_close(inode);
 			ntfs_umount(vol, FALSE);
 			ntfs_attr_close(attr);
 			return -errno;
@@ -115,6 +118,7 @@ int dump_file(int img, const char *path, int out)
 		if (written != bytesRead)
 		{
 			free(attrName);
+			ntfs_inode_close(inode);
 			ntfs_umount(vol, FALSE);
 			ntfs_attr_close(attr);
 			return -errno;
