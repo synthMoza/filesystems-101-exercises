@@ -66,7 +66,10 @@ int dump_file(int img, const char *path, int out)
 	ATTR_TYPES attrType = AT_DATA;
 	int attrLen = ntfs_mbstoucs("DATA", &attrName);
 	if (attrLen < 0)
+	{
+		ntfs_umount(vol, FALSE);
 		return -1; // cant get attribute name
+	}
 
 	ntfs_attr* attr = ntfs_attr_open(inode, attrType, attrName, attrLen);
 	if (!attr)
