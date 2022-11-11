@@ -53,7 +53,10 @@ int dump_file(int img, const char *path, int out)
 	ntfs_inode *inode = NULL;
 	inode = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!inode)
+	{
+		ntfs_umount(vol, FALSE);
 		return -errno;
+	}
 
 	// copy inode data to out fd
 	const unsigned bufferSize = 4096;
@@ -61,7 +64,7 @@ int dump_file(int img, const char *path, int out)
 
 	ntfschar* attrName = NULL;
 	ATTR_TYPES attrType = AT_DATA;
-	int attrLen = ntfs_mbstoucs("$DATA", &attrName);
+	int attrLen = ntfs_mbstoucs("DATA", &attrName);
 	if (attrLen < 0)
 		return -1; // cant get attribute name
 
