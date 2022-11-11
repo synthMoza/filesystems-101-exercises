@@ -59,7 +59,7 @@ int dump_file(int img, const char *path, int out)
 	const unsigned bufferSize = 4096;
 	char buffer[bufferSize];
 
-	ntfschar* attrName;
+	ntfschar* attrName = NULL;
 	ATTR_TYPES attrType = AT_DATA;
 	int attrLen = ntfs_mbstoucs("$DATA", &attrName);
 	if (attrLen < 0)
