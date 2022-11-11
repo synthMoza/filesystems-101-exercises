@@ -68,18 +68,18 @@ int dump_file(int img, const char *path, int out)
 	int attrLen = ntfs_mbstoucs("DATA", &attrName);
 	if (attrLen < 0)
 	{
-		// free(attrName);
-		// ntfs_inode_close(inode);
-		// ntfs_umount(vol, FALSE);
+		free(attrName);
+		ntfs_inode_close(inode);
+		ntfs_umount(vol, FALSE);
 		return -1; // cant get attribute name
 	}
 
 	ntfs_attr* attr = ntfs_attr_open(inode, attrType, attrName, attrLen);
 	if (!attr)
 	{
-		free(attrName);
-		ntfs_inode_close(inode);
-		ntfs_umount(vol, FALSE);
+		// free(attrName);
+		// ntfs_inode_close(inode);
+		// ntfs_umount(vol, FALSE);
 		return -1; // cant read data atribute
 	}
 
