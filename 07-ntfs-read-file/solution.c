@@ -50,7 +50,7 @@ int dump_file(int img, const char *path, int out)
 	inode = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!inode)
 	{
-		ntfs_umount(vol, FALSE);
+		// ntfs_umount(vol, FALSE);
 		return -errno;
 	}
 
@@ -100,9 +100,9 @@ int dump_file(int img, const char *path, int out)
 		written = write(out, buffer, bytesRead);
 		if (written != bytesRead)
 		{
-			// ntfs_inode_close(inode);
-			// ntfs_umount(vol, FALSE);
-			// ntfs_attr_close(attr);
+			ntfs_inode_close(inode);
+			ntfs_umount(vol, FALSE);
+			ntfs_attr_close(attr);
 			return -errno;
 		}
 		
