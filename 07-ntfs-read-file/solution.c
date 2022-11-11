@@ -65,7 +65,7 @@ int dump_file(int img, const char *path, int out)
 	// allocate buffer here, free outselves
 	ntfschar* attrName = (ntfschar*) malloc(PATH_MAX * sizeof(char));
 	ATTR_TYPES attrType = AT_DATA;
-	int attrLen = ntfs_mbstoucs("DATA", &attrName);
+	int attrLen = ntfs_mbstoucs("$DATA", &attrName);
 	if (attrLen < 0)
 	{
 		free(attrName);
