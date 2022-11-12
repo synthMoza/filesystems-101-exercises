@@ -33,6 +33,7 @@ int GetFileNameByFd(int fd, char* buffer)
 int dump_file(int img, const char *path, int out)
 {
 	// mount image
+	
 	// maybe it can be done much more effectively
 
 	// get device/file name
