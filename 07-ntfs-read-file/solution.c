@@ -32,8 +32,16 @@ int GetFileNameByFd(int fd, char* buffer)
 
 int dump_file(int img, const char *path, int out)
 {
-	// mount image
+	ntfs_attr* attr = NULL;
+	ntfs_volume *vol = NULL;
+	ntfs_inode *inode = NULL;
 
+	const unsigned bufferSize = 4096;
+	char buffer[bufferSize];
+
+	int r = 0;
+
+	// mount image
 	// maybe it can be done much more effectively
 
 	// get device/file name
@@ -41,31 +49,25 @@ int dump_file(int img, const char *path, int out)
 	if (GetFileNameByFd(img, fileName) < 0)
 		return -1; // cant read file name
 
-	ntfs_volume *vol = NULL;
 	vol = ntfs_mount(fileName, NTFS_MNT_RDONLY);
 	if (!vol)
 		return -1;
 
 	// find inode by path
-	ntfs_inode *inode = NULL;
 	inode = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!inode)
 	{
-		ntfs_umount(vol, FALSE);
-		return -errno;
+		r = -errno;
+		goto out;
 	}
 
 	// copy inode data to out fd
-	const unsigned bufferSize = 4096;
-	char buffer[bufferSize];
-
 	ATTR_TYPES attrType = AT_DATA;
-	ntfs_attr* attr = ntfs_attr_open(inode, attrType, NULL, 0);
+	attr = ntfs_attr_open(inode, attrType, NULL, 0);
 	if (!attr)
 	{
-		ntfs_inode_close(inode);
-		ntfs_umount(vol, FALSE);
-		return -1; // cant read data atribute
+		r = -1;
+		goto out;
 	}
 
 	u32 blockSize = 0;
@@ -89,10 +91,8 @@ int dump_file(int img, const char *path, int out)
 
 		if (bytesRead < 0) 
 		{
-			ntfs_inode_close(inode);
-			ntfs_umount(vol, FALSE);
-			ntfs_attr_close(attr);
-			return -errno;
+			r = -errno;
+			goto out;
 		}
 
 		if (!bytesRead)
@@ -101,18 +101,17 @@ int dump_file(int img, const char *path, int out)
 		written = write(out, buffer, bytesRead);
 		if (written != bytesRead)
 		{
-			ntfs_inode_close(inode);
-			ntfs_umount(vol, FALSE);
-			ntfs_attr_close(attr);
-			return -errno;
+			r = -errno;
+			goto out;
 		}
 		
 		offset += bytesRead;
 	}
 
+out:
 	ntfs_attr_close(attr);
 	ntfs_inode_close(inode);
 	ntfs_umount(vol, FALSE);
 
-	return 0;
+	return r;
 }
