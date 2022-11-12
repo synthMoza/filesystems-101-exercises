@@ -98,12 +98,7 @@ ntfs_inode* my_ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent, cons
 		if (inum == (u64) -1) {
 			ntfs_log_debug("Couldn't find name '%s' in pathname "
 					"'%s'.\n", p, pathname);
-			// if it was a directory, we will find another PATH_SEP
-			q = strchr(p, PATH_SEP);
-			if (q)
-				err = ENOTDIR;
-			else
-				err = ENOENT;
+			err = ENOENT;
 			goto close;
 		}
 
@@ -120,6 +115,16 @@ ntfs_inode* my_ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent, cons
 					(unsigned long long)inum, p);
 			err = EIO;
 			goto close;
+		}
+
+		if (q != NULL)
+		{
+			// check that ni is a directory
+			if (!(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY))
+			{
+				err = ENOTDIR;
+				goto close;
+			}
 		}
 	
 		free(unicode);
