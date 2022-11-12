@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #define __timespec_defined // dont know why, but if there is no such define, it can not be copmpiled
 
