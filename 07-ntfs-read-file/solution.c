@@ -33,7 +33,7 @@ int GetFileNameByFd(int fd, char* buffer)
 int dump_file(int img, const char *path, int out)
 {
 	// mount image
-	
+
 	// maybe it can be done much more effectively
 
 	// get device/file name
@@ -51,7 +51,7 @@ int dump_file(int img, const char *path, int out)
 	inode = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!inode)
 	{
-		ntfs_umount(vol, FALSE);
+		// ntfs_umount(vol, FALSE);
 		return -errno;
 	}
 
