@@ -51,7 +51,7 @@ int dump_file(int img, const char *path, int out)
 	inode = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!inode)
 	{
-		// ntfs_umount(vol, FALSE);
+		ntfs_umount(vol, FALSE);
 		return -errno;
 	}
 
