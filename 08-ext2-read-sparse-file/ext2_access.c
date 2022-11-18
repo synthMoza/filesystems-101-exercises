@@ -102,14 +102,12 @@ static int IterateDIndirectBlock(struct ext2_access *access, char *blockBuffer, 
 
     indirectBlock.rawBuffer = blockBuffer;
     unsigned blockSize = GetBlockSize(access);
-    unsigned currentBlockSize = blockSize;
     block_type_t blockType = BLOCK_TYPE_NONE;
 
     char *blockBufferIndirect = (char *)malloc(blockSize);
     for (unsigned j = 0; j < blockSize / 4 && *currentSize > 0; ++j)
     {
         blockType = (indirectBlock.idArray[j] == 0) ? BLOCK_TYPE_SPARSE : BLOCK_TYPE_ORDINARY;
-        currentBlockSize = (*currentSize > blockSize) ? blockSize : *currentSize;
 
         if (blockType == BLOCK_TYPE_ORDINARY)
         {
@@ -137,14 +135,12 @@ static int IterateTIndirectBlock(struct ext2_access *access, char *blockBuffer, 
 
     indirectBlock.rawBuffer = blockBuffer;
     unsigned blockSize = GetBlockSize(access);
-    unsigned currentBlockSize = blockSize;
     block_type_t blockType = BLOCK_TYPE_NONE;
 
     char *blockBufferIndirect = (char *)malloc(blockSize);
     for (unsigned j = 0; j < blockSize / 4 && *currentSize > 0; ++j)
     {
         blockType = (indirectBlock.idArray[j] == 0) ? BLOCK_TYPE_SPARSE : BLOCK_TYPE_ORDINARY;
-        currentBlockSize = (*currentSize > blockSize) ? blockSize : *currentSize;
 
         if (blockType == BLOCK_TYPE_ORDINARY)
         {
