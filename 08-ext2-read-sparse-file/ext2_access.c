@@ -125,8 +125,6 @@ static int IterateDIndirectBlock(struct ext2_access *access, char *blockBuffer, 
             free(blockBufferIndirect);
             return -errno;
         }
-
-        *currentSize -= currentBlockSize;
     }
 
     free(blockBufferIndirect);
@@ -162,8 +160,6 @@ static int IterateTIndirectBlock(struct ext2_access *access, char *blockBuffer, 
             free(blockBufferIndirect);
             return -errno;
         }
-
-        *currentSize -= currentBlockSize;
     }
 
     free(blockBufferIndirect);
