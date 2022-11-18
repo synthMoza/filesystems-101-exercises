@@ -42,11 +42,20 @@ unsigned GetBlockSize(struct ext2_access* access);
 int GetInodeStruct(struct ext2_access* access, int inode_nr, struct ext2_inode* inode);
 
 /*
-    Visitor function for iterating over blocks 
-
-    @param zeroBlocksCount - stores count of sparse blocks till this block
+    Block type for visitor function
 */
-typedef int (*block_visitor)(struct ext2_access* access, size_t zeroBlocksCount, char* block, void* data);
+typedef enum block_type
+{
+    BLOCK_TYPE_NONE = -1,
+    BLOCK_TYPE_ORDINARY,
+    BLOCK_TYPE_SPARSE,
+    BLOCK_TYPE_COUNT
+} block_type_t;
+
+/*
+    Visitor function for iterating over blocks 
+*/
+typedef int (*block_visitor)(struct ext2_access* access, block_type_t blockType, char* block, size_t blockSize, void* data);
 
 /*
     Iterate inode's file blocks (direct and indirect ones) using visitor function

@@ -11,12 +11,6 @@ struct ext2_access
 #define NAME_MAX 255
 // ----------------------------------------------------------
 
-// Global variables
-// ----------------------------------------------------------
-// Count consequential blocks that are zero to write zeros to out files if they are sparse
-static size_t g_countSparseBlocks = 0;
-// ----------------------------------------------------------
-
 // Static helper functions
 // ----------------------------------------------------------
 
@@ -65,95 +59,111 @@ union IndirectBlock
     int32_t *idArray;
 };
 
-static int IterateIndirectBlock(struct ext2_access *access, char *blockBuffer, block_visitor visitor, void *data)
+static int IterateIndirectBlock(struct ext2_access *access, char *blockBuffer, unsigned* currentSize, block_visitor visitor, void *data)
 {
     union IndirectBlock indirectBlock;
 
     indirectBlock.rawBuffer = blockBuffer;
     unsigned blockSize = GetBlockSize(access);
+    unsigned currentBlockSize = blockSize;
+    block_type_t blockType = BLOCK_TYPE_NONE;
 
     char *blockBufferIndirect = (char *)malloc(blockSize);
-    for (unsigned j = 0; j < blockSize / 4; ++j)
+    for (unsigned j = 0; j < blockSize / 4 && *currentSize > 0; ++j)
     {
-        if (indirectBlock.idArray[j] == 0)
+        blockType = (indirectBlock.idArray[j] == 0) ? BLOCK_TYPE_SPARSE : BLOCK_TYPE_ORDINARY;
+        currentBlockSize = (*currentSize > blockSize) ? blockSize : *currentSize;
+
+        if (blockType == BLOCK_TYPE_ORDINARY)
         {
-            g_countSparseBlocks++;
-            continue ;
+            if (ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect) < 0)
+            {
+                free(blockBufferIndirect);
+                return -errno;
+            }
         }
 
-        if (ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect) < 0)
+        if (visitor(access, blockType, blockBufferIndirect, currentBlockSize, data) < 0)
         {
             free(blockBufferIndirect);
             return -errno;
         }
 
-        if (visitor(access, g_countSparseBlocks, blockBufferIndirect, data) < 0)
-        {
-            free(blockBufferIndirect);
-            return -errno;
-        }
-
-        g_countSparseBlocks = 0;
+        *currentSize -= currentBlockSize;
     }
 
     free(blockBufferIndirect);
     return 0;
 }
 
-static int IterateDIndirectBlock(struct ext2_access *access, char *blockBuffer, block_visitor visitor, void *data)
+static int IterateDIndirectBlock(struct ext2_access *access, char *blockBuffer, unsigned* currentSize, block_visitor visitor, void *data)
 {
     union IndirectBlock indirectBlock;
 
     indirectBlock.rawBuffer = blockBuffer;
     unsigned blockSize = GetBlockSize(access);
+    unsigned currentBlockSize = blockSize;
+    block_type_t blockType = BLOCK_TYPE_NONE;
 
     char *blockBufferIndirect = (char *)malloc(blockSize);
-    for (unsigned j = 0; j < blockSize / 4; ++j)
+    for (unsigned j = 0; j < blockSize / 4 && *currentSize > 0; ++j)
     {
-        if (indirectBlock.idArray[j] == 0)
-            break; // terminate
+        blockType = (indirectBlock.idArray[j] == 0) ? BLOCK_TYPE_SPARSE : BLOCK_TYPE_ORDINARY;
+        currentBlockSize = (*currentSize > blockSize) ? blockSize : *currentSize;
 
-        if (ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect) < 0)
+        if (blockType == BLOCK_TYPE_ORDINARY)
+        {
+            if (ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect) < 0)
+            {
+                free(blockBufferIndirect);
+                return -errno;
+            }
+        }
+
+        if (IterateIndirectBlock(access, blockBufferIndirect, currentSize, visitor, data) < 0)
         {
             free(blockBufferIndirect);
             return -errno;
         }
 
-        if (IterateIndirectBlock(access, blockBufferIndirect, visitor, data) < 0)
-        {
-            free(blockBufferIndirect);
-            return -errno;
-        }
+        *currentSize -= currentBlockSize;
     }
 
     free(blockBufferIndirect);
     return 0;
 }
 
-static int IterateTIndirectBlock(struct ext2_access *access, char *blockBuffer, block_visitor visitor, void *data)
+static int IterateTIndirectBlock(struct ext2_access *access, char *blockBuffer, unsigned* currentSize, block_visitor visitor, void *data)
 {
     union IndirectBlock indirectBlock;
 
     indirectBlock.rawBuffer = blockBuffer;
     unsigned blockSize = GetBlockSize(access);
+    unsigned currentBlockSize = blockSize;
+    block_type_t blockType = BLOCK_TYPE_NONE;
 
     char *blockBufferIndirect = (char *)malloc(blockSize);
-    for (unsigned j = 0; j < blockSize / 4; ++j)
+    for (unsigned j = 0; j < blockSize / 4 && *currentSize > 0; ++j)
     {
-        if (indirectBlock.idArray[j] == 0)
-            break; // terminate
+        blockType = (indirectBlock.idArray[j] == 0) ? BLOCK_TYPE_SPARSE : BLOCK_TYPE_ORDINARY;
+        currentBlockSize = (*currentSize > blockSize) ? blockSize : *currentSize;
 
-        if (ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect) < 0)
+        if (blockType == BLOCK_TYPE_ORDINARY)
+        {
+            if (ReadBlock(access, indirectBlock.idArray[j], blockBufferIndirect) < 0)
+            {
+                free(blockBufferIndirect);
+                return -errno;
+            }
+        }
+
+        if (IterateDIndirectBlock(access, blockBufferIndirect, currentSize, visitor, data) < 0)
         {
             free(blockBufferIndirect);
             return -errno;
         }
 
-        if (IterateDIndirectBlock(access, blockBufferIndirect, visitor, data) < 0)
-        {
-            free(blockBufferIndirect);
-            return -errno;
-        }
+        *currentSize -= currentBlockSize;
     }
 
     free(blockBufferIndirect);
@@ -167,9 +177,11 @@ struct DirToFindEntryByNameStruct
     int out;
 };
 
-static int VisitDirToFindEntryByName(struct ext2_access *access, size_t sparseBlocksCount, char *block, void *data)
+static int VisitDirToFindEntryByName(struct ext2_access* access, block_type_t blockType, char* block, size_t blockSize, void* data)
 {
-    (void) sparseBlocksCount; // ignore sparseBlocksCount with directories
+    (void) blockType;
+    (void) blockSize; // ignore these parameters
+
     struct DirToFindEntryByNameStruct *fileData = (struct DirToFindEntryByNameStruct *)data;
 
     // get first dir entry
@@ -327,37 +339,47 @@ int IterateFileBlocksByInode(struct ext2_access *access, int inode_nr, block_vis
     struct ext2_inode inode;
     struct ext2_sparse_header;
     RETURN_IF_FAIL(GetInodeStruct(access, inode_nr, &inode));
+    unsigned blockSize = GetBlockSize(access);
 
     char *blockBuffer = (char *)malloc(GetBlockSize(access));
-    for (int i = 0; i < EXT2_N_BLOCKS; ++i)
+    unsigned currentSize = inode.i_size;
+    unsigned currentBlockSize = blockSize;
+    block_type_t blockType = BLOCK_TYPE_NONE;
+
+    for (int i = 0; i < EXT2_N_BLOCKS && currentSize > 0; ++i)
     {
-        if (inode.i_block[i] == 0)
+        blockType = (inode.i_block[i] == 0) ? BLOCK_TYPE_SPARSE : BLOCK_TYPE_ORDINARY;
+
+        if (blockType == BLOCK_TYPE_ORDINARY)
         {
-            g_countSparseBlocks++;
-            continue ; //nothing to do it with it, yet
+            // read current block
+            if (ReadBlock(access, inode.i_block[i], blockBuffer) < 0)
+            {
+                free(blockBuffer);
+                return -errno;
+            }
+        }
+        else if (i >= EXT2_NDIR_BLOCKS) // blockType == BLOCK_TYPE_SPARSE && i >= EXT2_NDIR_BLOCKS - impossible
+        {
+            break; // terminate
         }
 
-        // read current block
-        if (ReadBlock(access, inode.i_block[i], blockBuffer) < 0)
-        {
-            free(blockBuffer);
-            return -errno;
-        }
+        currentBlockSize = (currentSize > blockSize) ? blockSize : currentSize;
 
         // direct blocks
         if (i < EXT2_NDIR_BLOCKS)
         {
-            if (visitor(access, g_countSparseBlocks, blockBuffer, data) < 0)
+            if (visitor(access, blockType, blockBuffer, currentBlockSize, data) < 0)
             {
                 free(blockBuffer);
                 return -errno;
             }
 
-            g_countSparseBlocks = 0;
+            currentSize -= currentBlockSize;
         }
         else if (i == EXT2_IND_BLOCK)
         {
-            if (IterateIndirectBlock(access, blockBuffer, visitor, data) < 0)
+            if (IterateIndirectBlock(access, blockBuffer, &currentSize, visitor, data) < 0)
             {
                 free(blockBuffer);
                 return -errno;
@@ -365,7 +387,7 @@ int IterateFileBlocksByInode(struct ext2_access *access, int inode_nr, block_vis
         }
         else if (i == EXT2_DIND_BLOCK)
         {
-            if (IterateDIndirectBlock(access, blockBuffer, visitor, data) < 0)
+            if (IterateDIndirectBlock(access, blockBuffer, &currentSize, visitor, data) < 0)
             {
                 free(blockBuffer);
                 return -errno;
@@ -373,7 +395,7 @@ int IterateFileBlocksByInode(struct ext2_access *access, int inode_nr, block_vis
         }
         else if (i == EXT2_TIND_BLOCK)
         {
-            if (IterateTIndirectBlock(access, blockBuffer, visitor, data) < 0)
+            if (IterateTIndirectBlock(access, blockBuffer, &currentSize, visitor, data) < 0)
             {
                 free(blockBuffer);
                 return -errno;
