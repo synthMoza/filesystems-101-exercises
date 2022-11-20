@@ -447,6 +447,9 @@ bool btree_contains(struct btree *t, int x)
         errno = EINVAL;
         return false;
     }
+
+	if (!t->root)
+		return false;
     
     return btree_node_contains(t->root, x);
 }
