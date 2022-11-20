@@ -404,16 +404,24 @@ static bool btree_node_contains(struct btree_node* r, int x)
     while (i < r->count && x > r->keys[i])
 		++i;
 
-    if (i < r->count && r->keys[i] == x)
-    {
-        return true;
-    }
-    else
-    {
-        if (r->leaf) // nowhere to search
-            return false;
-        return btree_node_contains(r->children[i], x);
-    }
+	if (i < r->count)
+	{
+		if (i < r->count && r->keys[i] == x)
+		{
+        	return true;
+		}
+		else
+		{
+			if (r->leaf) // nowhere to search
+				return false;
+			return btree_node_contains(r->children[i], x);
+		}
+	}
+
+    if (r->leaf) // nowhere to search
+		return false;
+	
+	return btree_node_contains(r->children[i], x);
 }
 
 bool btree_contains(struct btree *t, int x)
