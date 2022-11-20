@@ -285,7 +285,7 @@ static void btree_fill(struct btree_node* n, unsigned i)
         }
 
         first->keys[0] = n->keys[i - 1];
-		
+
         if (!first->leaf)
         {
             first->children[0] = second->children[second->count];
@@ -381,11 +381,11 @@ static bool btree_node_contains(struct btree_node* r, int x)
     if (r->count == 0)
         return false;
 
-    int i = r->count - 1;
-    while (i >= 0 && x < r->keys[i])
-            --i;
+    unsigned i = 0;
+    while (i < r->count && x > r->keys[i])
+		--i;
 
-    if ((unsigned) i < r->count && r->keys[i] == x)
+    if (i < r->count && r->keys[i] == x)
     {
         return true;
     }
@@ -393,7 +393,7 @@ static bool btree_node_contains(struct btree_node* r, int x)
     {
         if (r->leaf) // nowhere to search
             return false;
-        return btree_node_contains(r->children[i + 1], x);
+        return btree_node_contains(r->children[i], x);
     }
 }
 
