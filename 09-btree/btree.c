@@ -383,7 +383,7 @@ static bool btree_node_contains(struct btree_node* r, int x)
 
     unsigned i = 0;
     while (i < r->count && x > r->keys[i])
-		--i;
+		++i;
 
     if (i < r->count && r->keys[i] == x)
     {
