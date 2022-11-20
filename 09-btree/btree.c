@@ -219,7 +219,7 @@ static void btree_merge(struct btree_node* n, unsigned i)
     for (unsigned j = i + 2; j <= n->count; ++j)
         n->children[j - 1] = n->children[j];
 
-    first->count += (second->count + 1);
+    first->count += second->count + 1;
     n->count--;
 
     free(second->keys);
@@ -354,11 +354,11 @@ static void btree_node_delete(struct btree_node* n, int x)
             return ;
         }
  
-        bool flag = (i == n->count);
+        unsigned savedCount = n->count;
         if (n->children[i]->count < n->t)
             btree_fill(n, i);
  
-        if (flag && i > n->count)
+        if (savedCount == i && i > n->count)
             btree_node_delete(n->children[i - 1], x);
         else
             btree_node_delete(n->children[i], x);
@@ -373,7 +373,26 @@ void btree_delete(struct btree *t, int x)
         return ;
     }
 
+	if (!btree_contains(t, x))
+		return ; // do not need to delete
+	
     btree_node_delete(t->root, x);
+
+	// Root might have zero keys but only one child, replace root with this child
+	if (t->root->count == 0)
+	{
+		// no keys but one child
+		struct btree_node* node = t->root;
+		if (t->root->leaf)
+			t->root = NULL; // root is a leaf
+		else
+			t->root = t->root->children[0]; // save one and only child instead of empty root
+
+		// remove root but not recursively
+		free(node->keys);
+		free(node->children);
+		free(node);
+	}
 }
 
 static bool btree_node_contains(struct btree_node* r, int x)
