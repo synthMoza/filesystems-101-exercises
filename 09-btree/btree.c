@@ -492,6 +492,8 @@ void stack_free(struct stack* st)
     {
         if (st->data)
             free(st->data);
+		
+		free(st);
     }
 }
 
