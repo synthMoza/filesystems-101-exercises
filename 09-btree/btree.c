@@ -404,7 +404,7 @@ static bool btree_node_contains(struct btree_node* r, int x)
     while (i < r->count && x > r->keys[i])
 		++i;
 
-	if (i < r->count)
+	if (i < r->count) // check not to be out of range with r->keys[i]
 	{
 		if (i < r->count && r->keys[i] == x)
 		{
