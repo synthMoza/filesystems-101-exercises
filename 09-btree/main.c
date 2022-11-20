@@ -3,11 +3,15 @@
 
 int main()
 {
-	struct btree *t = btree_alloc(1);
-	btree_insert(t, 0);
-	btree_insert(t, 1);
-	btree_insert(t, 2);
-	btree_delete(t, 1);
+	struct btree *t = btree_alloc(2);
+	
+	for (int i = 0; i < 6; i++)
+		btree_insert(t, i);
+	
+	btree_delete(t, 2);
+
+	for (int i = 0; i < 9; ++i)
+		printf("contains %i: %d\n", i, btree_contains(t, i));
 
 	struct btree_iter *i = btree_iter_start(t);
 	int x;
