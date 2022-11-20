@@ -184,6 +184,7 @@ void btree_insert(struct btree *t, int x)
 			return ; // no mem
 		t->root->keys[0] = x;
 		t->root->count = 1;
+		t->root->leaf = true;
 		return ;
 	}
 
@@ -586,9 +587,11 @@ static struct btree_iter* btree_node_iter_start(struct btree_node* n)
 
     // get first element
     it->currentNode = n;
-    while (it->currentNode->count > 0 && !it->currentNode->leaf)
+    while (it->currentNode->count > 0)
     {
         stack_push_back(it->st, it->currentNode, 0);
+		if (it->currentNode->leaf)
+			break;
         it->currentNode = it->currentNode->children[0];
     }
 
@@ -631,21 +634,29 @@ bool btree_iter_next(struct btree_iter *i, int *x)
         {
             // pop stack, get next it
             struct stack_data* data = stack_pop(i->st);
-            while (data->idx >= data->node->count && stack_size(i->st) > 0)
-                data = stack_pop(i->st); // pop until not iterated leaf
-            
-            if (stack_size(i->st) == 0)
-            {
-                // we are in root node
-                if (data->idx > data->node->count + 1)
-                {
-                    // end
-                    return false;
-                }
-            }
 
-            i->currentNode = data->node;
-            i->currentIdx = data->idx;
+			if (data)
+			{
+				while (data->idx >= data->node->count && stack_size(i->st) > 0)
+					data = stack_pop(i->st); // pop until not iterated leaf
+				
+				if (stack_size(i->st) == 0)
+				{
+					// we are in root node
+					if (data->idx > data->node->count + 1)
+					{
+						// end
+						return false;
+					}
+				}
+
+				i->currentNode = data->node;
+				i->currentIdx = data->idx;
+			}
+			else
+			{
+				return false;
+			}
         }
         // else == already incremented            
     }
@@ -673,28 +684,28 @@ bool btree_iter_next(struct btree_iter *i, int *x)
             // no children
             // pop stack, get next it
             struct stack_data* data = stack_pop(i->st);
-            while (data->idx >= data->node->count && stack_size(i->st) > 0)
+			if (data)
+			{
+				while (data->idx >= data->node->count && stack_size(i->st) > 0)
                 data = stack_pop(i->st); // pop until not iterated leaf
             
-            if (stack_size(i->st) == 0)
-            {
-                // we are in root node
-                if (data->idx > data->node->count + 1)
-                {
-                    // end
-                    return false;
-                }
-                // else
-                // {
-                //     // push curent node with fresh idx
-                //     stack_push_back(i->st, i->currentNode, i->currentIdx);
-                //     // get new begin
-                //     i = btree_node_iter_start(i->currentNode->children[i->currentIdx]);
-                // }
-            }
+				if (stack_size(i->st) == 0)
+				{
+					// we are in root node
+					if (data->idx > data->node->count + 1)
+					{
+						// end
+						return false;
+					}
+				}
 
-            i->currentNode = data->node;
-            i->currentIdx = data->idx;
+				i->currentNode = data->node;
+				i->currentIdx = data->idx;
+			}
+            else
+			{
+				return false;
+			}
         }
     }
 
