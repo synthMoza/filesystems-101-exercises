@@ -177,6 +177,19 @@ void btree_insert(struct btree *t, int x)
         return ;
     }
 
+	if (!t->root)
+	{
+		t->root = btree_node_alloc(t->t);
+		if (!t->root)
+			return ; // no mem
+		t->root->keys[0] = x;
+		t->root->count = 1;
+		return ;
+	}
+
+	if (btree_contains(t, x))
+		return ; // already is presented in tree
+
     struct btree_node* r = t->root;
     if (r->count == 2 * t->t - 1)
     {
@@ -372,6 +385,9 @@ void btree_delete(struct btree *t, int x)
         errno = EINVAL;
         return ;
     }
+
+	if (!t->root)
+		return ;
 
 	if (!btree_contains(t, x))
 		return ; // do not need to delete
