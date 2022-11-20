@@ -177,19 +177,19 @@ void btree_insert(struct btree *t, int x)
         return ;
     }
 
-	if (!t->root)
-	{
-		t->root = btree_node_alloc(t->t);
-		if (!t->root)
-			return ; // no mem
-		t->root->keys[0] = x;
-		t->root->count = 1;
-		t->root->leaf = true;
-		return ;
-	}
+    if (!t->root)
+    {
+        t->root = btree_node_alloc(t->t);
+        if (!t->root)
+            return ; // no mem
+        t->root->keys[0] = x;
+        t->root->count = 1;
+        t->root->leaf = true;
+        return ;
+    }
 
-	if (btree_contains(t, x))
-		return ; // already is presented in tree
+    if (btree_contains(t, x))
+        return ; // already is presented in tree
 
     struct btree_node* r = t->root;
     if (r->count == 2 * t->t - 1)
@@ -237,8 +237,8 @@ static void btree_merge(struct btree_node* n, unsigned i)
     n->count--;
 
     free(second->keys);
-	free(second->children);
-	free(second);
+    free(second->children);
+    free(second);
 }
 
 static void btree_remove_from_leaf(struct btree_node* n, unsigned i)
@@ -387,29 +387,29 @@ void btree_delete(struct btree *t, int x)
         return ;
     }
 
-	if (!t->root)
-		return ;
+    if (!t->root)
+        return ;
 
-	if (!btree_contains(t, x))
-		return ; // do not need to delete
-	
+    if (!btree_contains(t, x))
+        return ; // do not need to delete
+    
     btree_node_delete(t->root, x);
 
-	// Root might have zero keys but only one child, replace root with this child
-	if (t->root->count == 0)
-	{
-		// no keys but one child
-		struct btree_node* node = t->root;
-		if (t->root->leaf)
-			t->root = NULL; // root is a leaf
-		else
-			t->root = t->root->children[0]; // save one and only child instead of empty root
+    // Root might have zero keys but only one child, replace root with this child
+    if (t->root->count == 0)
+    {
+        // no keys but one child
+        struct btree_node* node = t->root;
+        if (t->root->leaf)
+            t->root = NULL; // root is a leaf
+        else
+            t->root = t->root->children[0]; // save one and only child instead of empty root
 
-		// remove root but not recursively
-		free(node->keys);
-		free(node->children);
-		free(node);
-	}
+        // remove root but not recursively
+        free(node->keys);
+        free(node->children);
+        free(node);
+    }
 }
 
 static bool btree_node_contains(struct btree_node* r, int x)
@@ -419,26 +419,26 @@ static bool btree_node_contains(struct btree_node* r, int x)
 
     unsigned i = 0;
     while (i < r->count && x > r->keys[i])
-		++i;
+        ++i;
 
-	if (i < r->count) // check not to be out of range with r->keys[i]
-	{
-		if (i < r->count && r->keys[i] == x)
-		{
-        	return true;
-		}
-		else
-		{
-			if (r->leaf) // nowhere to search
-				return false;
-			return btree_node_contains(r->children[i], x);
-		}
-	}
+    if (i < r->count) // check not to be out of range with r->keys[i]
+    {
+        if (i < r->count && r->keys[i] == x)
+        {
+            return true;
+        }
+        else
+        {
+            if (r->leaf) // nowhere to search
+                return false;
+            return btree_node_contains(r->children[i], x);
+        }
+    }
 
     if (r->leaf) // nowhere to search
-		return false;
-	
-	return btree_node_contains(r->children[i], x);
+        return false;
+    
+    return btree_node_contains(r->children[i], x);
 }
 
 bool btree_contains(struct btree *t, int x)
@@ -449,8 +449,8 @@ bool btree_contains(struct btree *t, int x)
         return false;
     }
 
-	if (!t->root)
-		return false;
+    if (!t->root)
+        return false;
     
     return btree_node_contains(t->root, x);
 }
@@ -493,8 +493,8 @@ void stack_free(struct stack* st)
     {
         if (st->data)
             free(st->data);
-		
-		free(st);
+        
+        free(st);
     }
 }
 
@@ -589,9 +589,9 @@ static struct btree_iter* btree_node_iter_start(struct btree_node* n)
     it->currentNode = n;
     while (it->currentNode->count > 0)
     {
+        if (it->currentNode->leaf)
+            break;
         stack_push_back(it->st, it->currentNode, 0);
-		if (it->currentNode->leaf)
-			break;
         it->currentNode = it->currentNode->children[0];
     }
 
@@ -625,6 +625,9 @@ bool btree_iter_next(struct btree_iter *i, int *x)
     if (i->currentIdx >= i->currentNode->count)
         return false; // end
 
+    if (!i->currentNode)
+        return false;
+
     *x = i->currentNode->keys[i->currentIdx++];
     if (i->currentNode->leaf)
     {
@@ -635,28 +638,28 @@ bool btree_iter_next(struct btree_iter *i, int *x)
             // pop stack, get next it
             struct stack_data* data = stack_pop(i->st);
 
-			if (data)
-			{
-				while (data->idx >= data->node->count && stack_size(i->st) > 0)
-					data = stack_pop(i->st); // pop until not iterated leaf
-				
-				if (stack_size(i->st) == 0)
-				{
-					// we are in root node
-					if (data->idx > data->node->count + 1)
-					{
-						// end
-						return false;
-					}
-				}
+            if (data)
+            {
+                while (data->idx >= data->node->count && stack_size(i->st) > 0)
+                    data = stack_pop(i->st); // pop until not iterated leaf
+                
+                if (stack_size(i->st) == 0)
+                {
+                    // we are in root node
+                    if (data->idx > data->node->count + 1)
+                    {
+                        // end
+                        return false;
+                    }
+                }
 
-				i->currentNode = data->node;
-				i->currentIdx = data->idx;
-			}
-			else
-			{
-				return false;
-			}
+                i->currentNode = data->node;
+                i->currentIdx = data->idx;
+            }
+            else
+            {
+                return true;
+            }
         }
         // else == already incremented            
     }
@@ -684,28 +687,28 @@ bool btree_iter_next(struct btree_iter *i, int *x)
             // no children
             // pop stack, get next it
             struct stack_data* data = stack_pop(i->st);
-			if (data)
-			{
-				while (data->idx >= data->node->count && stack_size(i->st) > 0)
+            if (data)
+            {
+                while (data->idx >= data->node->count && stack_size(i->st) > 0)
                 data = stack_pop(i->st); // pop until not iterated leaf
             
-				if (stack_size(i->st) == 0)
-				{
-					// we are in root node
-					if (data->idx > data->node->count + 1)
-					{
-						// end
-						return false;
-					}
-				}
+                if (stack_size(i->st) == 0)
+                {
+                    // we are in root node
+                    if (data->idx > data->node->count + 1)
+                    {
+                        // end
+                        return false;
+                    }
+                }
 
-				i->currentNode = data->node;
-				i->currentIdx = data->idx;
-			}
+                i->currentNode = data->node;
+                i->currentIdx = data->idx;
+            }
             else
-			{
-				return false;
-			}
+            {
+                return true;
+            }
         }
     }
 
