@@ -228,10 +228,10 @@ static void btree_merge(struct btree_node* n, unsigned i)
     }
 
     for (unsigned j = i + 1; j < n->count; ++j)
+    {
         n->keys[j - 1] = n->keys[j];
-    
-    for (unsigned j = i + 2; j <= n->count; ++j)
-        n->children[j - 1] = n->children[j];
+        n->children[j] = n->children[j + 1];
+    }
 
     first->count += second->count + 1;
     n->count--;
@@ -251,6 +251,8 @@ static void btree_remove_from_leaf(struct btree_node* n, unsigned i)
 
 static void btree_remove_from_non_leaf(struct btree_node* n, unsigned i)
 {
+    int k = n->keys[i];
+
     if (n->children[i]->count >= n->t)
     {
         // get predecessor value (the fatherst right leaf in the sub tree)
@@ -277,7 +279,7 @@ static void btree_remove_from_non_leaf(struct btree_node* n, unsigned i)
     {
         // merge and delete from the new node
         btree_merge(n, i);
-        btree_node_delete(n->children[i], n->keys[i]);
+        btree_node_delete(n->children[i], k);
     }
 }
 
