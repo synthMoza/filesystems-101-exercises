@@ -20,6 +20,27 @@ static struct ext2_access* g_access = NULL;
 // helper functions and structs
 // ====================
 
+static int ext2_fuse_inode_to_stbuf(ino_t inodeNum, struct ext2_inode* inode, struct stat* stbuf)
+{
+	if (!inode || !stbuf)
+		return -EINVAL;
+
+	stbuf->st_ino = inodeNum;
+	stbuf->st_mode = inode->i_mode;
+	stbuf->st_nlink = inode->i_links_count;
+	stbuf->st_uid = inode->i_uid;
+	stbuf->st_gid = inode->i_gid;
+	
+	stbuf->st_size = inode->i_size;
+	stbuf->st_blksize = GetBlockSize(g_access);
+	stbuf->st_blocks = inode->i_blocks;
+	stbuf->st_atime = inode->i_atime;
+	stbuf->st_mtime = inode->i_mtime;
+	stbuf->st_ctime = inode->i_ctime;
+
+	return 0;
+}
+
 struct DirToListEntriesStruct
 {
     void* buf;
@@ -42,7 +63,14 @@ static int VisitDirToListEntries(struct ext2_access* access, block_type_t blockT
     {
 		char pathBuffer[PATH_MAX] = {0};
 		memcpy(pathBuffer, dirEntry->name, dirEntry->name_len);
-		fillerData->filler(fillerData->buf, pathBuffer, NULL, 0, 0);
+
+		struct stat stbuf;
+		struct ext2_inode inode;
+		if (GetInodeStruct(g_access, dirEntry->inode, &inode) < 0)
+			return -1;
+		
+		ext2_fuse_inode_to_stbuf(dirEntry->inode, &inode, &stbuf);
+		fillerData->filler(fillerData->buf, pathBuffer, &stbuf, 0, 0);
 
         // move to the nexty directory
         block += dirEntry->rec_len;
@@ -135,18 +163,7 @@ static int ext2_fuse_getattr(const char *path, struct stat *stbuf, struct fuse_f
 		return res;
 	
 	// fil stat buf
-	stbuf->st_ino = inodeNum;
-	stbuf->st_mode = inode.i_mode;
-	stbuf->st_nlink = inode.i_links_count;
-	stbuf->st_uid = inode.i_uid;
-	stbuf->st_gid = inode.i_gid;
-	
-	stbuf->st_size = inode.i_size;
-	stbuf->st_blksize = GetBlockSize(g_access);
-	stbuf->st_blocks = inode.i_blocks;
-	stbuf->st_atime = inode.i_atime;
-	stbuf->st_mtime = inode.i_mtime;
-	stbuf->st_ctime = inode.i_ctime;
+	ext2_fuse_inode_to_stbuf(inodeNum, &inode, stbuf);
 
 	return 0;
 }
