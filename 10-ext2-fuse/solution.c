@@ -87,6 +87,7 @@ struct ReadBlockVisitorStruct
 	char* buf;
 	off_t offset;
 	size_t size;
+	size_t read;
 };
 
 int ReadBlockVisitor(struct ext2_access* access, block_type_t blockType, char* block, size_t blockSize, void* data)
@@ -110,16 +111,20 @@ int ReadBlockVisitor(struct ext2_access* access, block_type_t blockType, char* b
 			if (readData->size < toRead)
 				toRead = readData->size; // do not have to read this block till the end
 			
-			memcpy((void*) readData->buf, (void*) block + readData->offset, toRead);
+			memcpy((void*) readData->buf + readData->read, (void*) block + readData->offset, toRead);
+			
 			readData->size -= toRead;
+			readData->read += toRead;
+			readData->offset = 0;
 		}
 	}
 	else if (readData->offset == 0)
 	{ 
 		// no offset
 		size_t toRead = (readData->size < blockSize) ? readData->size : blockSize;
-		memcpy((void*) readData->buf, (void*) block, toRead);
+		memcpy((void*) readData->buf + readData->read, (void*) block, toRead);
 		readData->size -= toRead;
+		readData->read += toRead;
 	}
 	else
 	{
@@ -217,7 +222,8 @@ static int ext2_fuse_read(const char *path, char *buf, size_t size, off_t offset
 	struct ReadBlockVisitorStruct readData = {
 		.buf = buf,
 		.offset = offset,
-		.size = size
+		.size = size,
+		.read = 0,
 	};
 
 	int res = 0;
