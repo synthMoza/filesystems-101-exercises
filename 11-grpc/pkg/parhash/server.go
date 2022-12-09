@@ -111,7 +111,7 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 	for i := 0; i < countBackends; i++ {
 		connectionsSlice[i], err = grpc.Dial(s.conf.BackendAddrs[i])
 		if err != nil {
-			log.Fatalf("Couldn't connect to backend addr %s", s.conf.BackendAddrs[i])
+			log.Fatalf("Couldn't connect to backend addr %s with error %s", s.conf.BackendAddrs[i], err)
 		}
 
 		defer connectionsSlice[i].Close()
