@@ -130,12 +130,8 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 			s.mutex.Lock()
 			// claim indices under lock
 			currentBackendIdx := globalBufferIdx
-
 			// update global idx in round robin manner
-			globalBufferIdx++
-			if globalBufferIdx >= countBuffers {
-				globalBufferIdx = 0
-			}
+			globalBufferIdx = (globalBufferIdx + 1) % countBuffers
 
 			hashReq := hashpb.HashReq{Data: req.Data[currentBufferIdx]}
 			s.mutex.Unlock()
