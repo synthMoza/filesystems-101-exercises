@@ -124,11 +124,11 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 	// limit goroutines count with semaphore
 	waitGroup := workgroup.New(workgroup.Config{Sem: s.sem})
 	for i := 0; i < countBuffers; i++ {
+		currentBufferIdx := i
 		waitGroup.Go(ctx, func(ctx context.Context) error {
 			s.mutex.Lock()
 			// claim indices under lock
-			currentBackendIdx := i % countBackends
-			currentBufferIdx := i
+			currentBackendIdx := currentBufferIdx % countBackends
 
 			hashReq := hashpb.HashReq{Data: req.Data[currentBufferIdx]}
 			s.mutex.Unlock()
