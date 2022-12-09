@@ -118,19 +118,18 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 		clientsSlice[i] = hashpb.NewHashSvcClient(connectionsSlice[i])
 	}
 
-	// distribute data across given amount of backends
-	// buffer[i] belongs to i % countBackends backend
 	countBuffers := len(req.Data)
 	hashes := make([][]byte, countBuffers)
 
 	// limit goroutines count with semaphore
 	waitGroup := workgroup.New(workgroup.Config{Sem: s.sem})
 	for i := 0; i < countBuffers; i++ {
-		currentBackendIdx := i % countBackends
-		currentBufferIdx := i
-
 		waitGroup.Go(ctx, func(ctx context.Context) error {
 			s.mutex.Lock()
+			// claim indices under lock
+			currentBackendIdx := i % countBackends
+			currentBufferIdx := i
+
 			hashReq := hashpb.HashReq{Data: req.Data[currentBufferIdx]}
 			s.mutex.Unlock()
 
