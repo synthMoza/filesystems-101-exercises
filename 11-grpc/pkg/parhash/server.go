@@ -109,7 +109,7 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 	clientsSlice := make([]hashpb.HashSvcClient, s.conf.Concurrency)
 
 	for i := 0; i < countBackends; i++ {
-		connectionsSlice[i], err = grpc.Dial(s.conf.BackendAddrs[i])
+		connectionsSlice[i], err = grpc.Dial(s.conf.BackendAddrs[i], grpc.WithInsecure())
 		if err != nil {
 			log.Fatalf("Couldn't connect to backend addr %s with error %s", s.conf.BackendAddrs[i], err)
 		}
