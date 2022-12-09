@@ -47,18 +47,20 @@ type Config struct {
 type Server struct {
 	conf Config
 
-	stop  context.CancelFunc
-	l     net.Listener
-	wg    sync.WaitGroup
-	mutex sync.Mutex // sync between concurrent ParallelHash() calls
+	stop            context.CancelFunc
+	l               net.Listener
+	wg              sync.WaitGroup
+	mutex           sync.Mutex // sync between concurrent ParallelHash() calls
+	globalBufferIdx int        // counter for ignoring order of goroutines
 
 	sem *semaphore.Weighted
 }
 
 func New(conf Config) *Server {
 	return &Server{
-		conf: conf,
-		sem:  semaphore.NewWeighted(int64(conf.Concurrency)),
+		conf:            conf,
+		sem:             semaphore.NewWeighted(int64(conf.Concurrency)),
+		globalBufferIdx: 0, // default init
 	}
 }
 
@@ -123,15 +125,14 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 
 	// limit goroutines count with semaphore
 	waitGroup := workgroup.New(workgroup.Config{Sem: s.sem})
-	globalBufferIdx := 0 // counter for ignoring order of goroutines
 	for i := 0; i < countBuffers; i++ {
 		currentBufferIdx := i
 		waitGroup.Go(ctx, func(ctx context.Context) error {
 			s.mutex.Lock()
 			// claim indices under lock
-			currentBackendIdx := globalBufferIdx
+			currentBackendIdx := s.globalBufferIdx
 			// update global idx in round robin manner
-			globalBufferIdx = (globalBufferIdx + 1) % countBackends
+			s.globalBufferIdx = (s.globalBufferIdx + 1) % countBackends
 
 			hashReq := hashpb.HashReq{Data: req.Data[currentBufferIdx]}
 			s.mutex.Unlock()
