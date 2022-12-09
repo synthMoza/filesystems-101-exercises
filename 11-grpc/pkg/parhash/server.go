@@ -104,9 +104,9 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 	s.mutex.Lock()
 
 	// connect to backends
-	countBackends := s.conf.Concurrency
-	connectionsSlice := make([]*grpc.ClientConn, s.conf.Concurrency)
-	clientsSlice := make([]hashpb.HashSvcClient, s.conf.Concurrency)
+	countBackends := len(s.conf.BackendAddrs)
+	connectionsSlice := make([]*grpc.ClientConn, countBackends)
+	clientsSlice := make([]hashpb.HashSvcClient, countBackends)
 
 	for i := 0; i < countBackends; i++ {
 		connectionsSlice[i], err = grpc.Dial(s.conf.BackendAddrs[i], grpc.WithInsecure())
