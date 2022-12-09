@@ -10,6 +10,8 @@ import (
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 
+	"fs101ex/pkg/workgroup"
+
 	hashpb "fs101ex/pkg/gen/hashsvc"
 	parhashpb "fs101ex/pkg/gen/parhashsvc"
 )
@@ -100,14 +102,11 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (resp *parhashpb.ParHashResp, err error) {
-	// calls to ParallelHash might be concurrent, serve each responce once at a time
-	s.mutex.Lock()
-
-	// connect to backends
 	countBackends := len(s.conf.BackendAddrs)
 	connectionsSlice := make([]*grpc.ClientConn, countBackends)
 	clientsSlice := make([]hashpb.HashSvcClient, countBackends)
 
+	// connect to backends
 	for i := 0; i < countBackends; i++ {
 		connectionsSlice[i], err = grpc.Dial(s.conf.BackendAddrs[i], grpc.WithInsecure())
 		if err != nil {
@@ -121,28 +120,36 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 
 	// distribute data across given amount of backends
 	// buffer[i] belongs to i % countBackends backend
-	buffersCount := len(req.Data)
-	hashes := make([][]byte, buffersCount)
+	countBuffers := len(req.Data)
+	hashes := make([][]byte, countBuffers)
 
-	// create countBackends goroutines that perform requests and then write to the responce
-	defer s.stop()
-	for i := 0; i < countBackends; i++ {
-		go func() {
-			for j := i; j < buffersCount; j += countBackends {
-				// send request and get responce
-				r, err := clientsSlice[j].Hash(ctx, &hashpb.HashReq{Data: req.Data[j]})
-				if err != nil {
-					log.Fatalf("Couldn't hash buffer number %d on backend %d with error %v", j, i, err)
-				}
+	// limit goroutines count with semaphore
+	waitGroup := workgroup.New(workgroup.Config{Sem: s.sem})
+	for i := 0; i < countBuffers; i++ {
+		waitGroup.Go(ctx, func(ctx context.Context) error {
+			currentIdx := i % countBackends
 
-				// write into responce using blocking with semaphore
-				s.sem.Acquire(ctx, 1)
-				hashes[j] = r.Hash
-				s.sem.Release(1)
+			s.mutex.Lock()
+			hashReq := hashpb.HashReq{Data: req.Data[i]}
+			s.mutex.Unlock()
+
+			r, err := clientsSlice[currentIdx].Hash(ctx, &hashReq)
+			if err != nil {
+				return err
 			}
-		}()
+
+			s.mutex.Lock()
+			hashes[i] = r.Hash
+			s.mutex.Unlock()
+
+			return nil
+		})
 	}
 
-	s.mutex.Unlock()
+	err = waitGroup.Wait()
+	if err != nil {
+		log.Fatalf("Error: can't hash given data with error %v", err)
+	}
+
 	return &parhashpb.ParHashResp{Hashes: hashes}, nil
 }
