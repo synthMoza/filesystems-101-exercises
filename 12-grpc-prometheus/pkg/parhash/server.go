@@ -98,7 +98,7 @@ func (s *Server) Start(ctx context.Context) (err error) {
 	s.callCounter = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: "parhash",
-			Name: "nr_nr_requests",
+			Name: "nr_requests",
 		})
 	s.conf.Prom.MustRegister(s.callCounter)
 
