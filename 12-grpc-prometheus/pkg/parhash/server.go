@@ -107,7 +107,7 @@ func (s *Server) Start(ctx context.Context) (err error) {
 		Name: "subquery_durations",
 		Buckets: prometheus.ExponentialBucketsRange(0.1, 10000, 24), // milliseconds
 		},
-		[]string{"backend"},
+		s.conf.BackendAddrs,
 	)
 	s.conf.Prom.MustRegister(s.backendHist)
 
@@ -173,17 +173,18 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 			// update global idx in round robin manner
 			s.globalBufferIdx = (s.globalBufferIdx + 1) % countBackends
 
-			// measure time that was taken to request backends
-			timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
-				s.backendHist.WithLabelValues("backend").Observe(v)
-			}))
-
 			hashReq := hashpb.HashReq{Data: req.Data[currentBufferIdx]}
 			
-			timer.ObserveDuration()
 			s.mutex.Unlock()
+			
+			// measure time that was taken to request backends
+			timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
+				s.backendHist.WithLabelValues(s.conf.BackendAddrs[currentBackendIdx]).Observe(v)
+			}))
 
 			r, err := clientsSlice[currentBackendIdx].Hash(ctx, &hashReq)
+			
+			timer.ObserveDuration()
 			if err != nil {
 				return err
 			}
