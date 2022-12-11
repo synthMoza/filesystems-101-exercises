@@ -107,7 +107,7 @@ func (s *Server) Start(ctx context.Context) (err error) {
 		Name: "subquery_durations",
 		Buckets: prometheus.ExponentialBucketsRange(0.1, 10000, 24), // milliseconds
 		},
-		s.conf.BackendAddrs,
+		[]string{"backend"},
 	)
 	s.conf.Prom.MustRegister(s.backendHist)
 
