@@ -68,7 +68,9 @@ type Server struct {
 	wg              sync.WaitGroup
 	mutex           sync.Mutex // sync between concurrent ParallelHash() calls
 	globalBufferIdx int        // counter for ignoring order of goroutines
+	
 	callCounter     prometheus.Counter
+	// backendHist		prometheus.Histogram
 
 	sem *semaphore.Weighted
 }
@@ -94,8 +96,16 @@ func (s *Server) Start(ctx context.Context) (err error) {
 
 	s.callCounter = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "nr_requests",
+			Namespace: "parhash",
+			Name: "nr_nr_requests",
 		})
+	s.conf.Prom.MustRegister(s.callCounter)
+
+	// s.backendHist = prometheus.NewHistogram(prometheus.HistogramOpts{
+	// 	Namespace: "parhash",
+	// 	Name: "subquery_durations",
+
+	// })
 
 	srv := grpc.NewServer()
 	parhashpb.RegisterParallelHashSvcServer(srv, s)
@@ -158,6 +168,9 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 			currentBackendIdx := s.globalBufferIdx
 			// update global idx in round robin manner
 			s.globalBufferIdx = (s.globalBufferIdx + 1) % countBackends
+
+			// measure time that was taken to request backends
+			// timer := prometheus.NewTimer(myHistogram)
 
 			hashReq := hashpb.HashReq{Data: req.Data[currentBufferIdx]}
 			s.mutex.Unlock()
