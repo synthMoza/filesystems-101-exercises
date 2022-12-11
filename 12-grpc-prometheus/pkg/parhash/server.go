@@ -70,7 +70,7 @@ type Server struct {
 	globalBufferIdx int        // counter for ignoring order of goroutines
 	
 	callCounter     prometheus.Counter
-	// backendHist		prometheus.Histogram
+	backendHist		*prometheus.HistogramVec
 
 	sem *semaphore.Weighted
 }
@@ -102,12 +102,12 @@ func (s *Server) Start(ctx context.Context) (err error) {
 		})
 	s.conf.Prom.MustRegister(s.callCounter)
 
-	s.backendHist = prometheus.NewHistogram(prometheus.HistogramOpts{
+	s.backendHist = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "parhash",
 		Name: "subquery_durations",
-		Buckets: prometheus.ExponentialBucketsRange(0.1, 10000, 24) // milliseconds
+		Buckets: prometheus.ExponentialBucketsRange(0.1, 10000, 24), // milliseconds
 		},
-		[]string{"backend"}
+		[]string{"backend"},
 	)
 
 	srv := grpc.NewServer()
@@ -173,10 +173,13 @@ func (s *Server) ParallelHash(ctx context.Context, req *parhashpb.ParHashReq) (r
 			s.globalBufferIdx = (s.globalBufferIdx + 1) % countBackends
 
 			// measure time that was taken to request backends
-			timer := prometheus.NewTimer(s.backendHist)
+			timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
+				s.backendHist.WithLabelValues("backend").Observe(v)
+			}))
+
 			hashReq := hashpb.HashReq{Data: req.Data[currentBufferIdx]}
-			timer.ObserveDuration()
 			
+			timer.ObserveDuration()
 			s.mutex.Unlock()
 
 			r, err := clientsSlice[currentBackendIdx].Hash(ctx, &hashReq)
