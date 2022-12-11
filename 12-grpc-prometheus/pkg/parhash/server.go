@@ -109,6 +109,7 @@ func (s *Server) Start(ctx context.Context) (err error) {
 		},
 		[]string{"backend"},
 	)
+	s.conf.Prom.MustRegister(s.backendHist)
 
 	srv := grpc.NewServer()
 	parhashpb.RegisterParallelHashSvcServer(srv, s)
